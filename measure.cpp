@@ -1,6 +1,6 @@
 // TwinFET measurement harness: runs the DSP engine offline and writes CSV/raw data
 // for tests/analyze.py.   Build:  g++ -O2 -std=c++17 measure.cpp -o measure
-#include "../dsp/TwinFetEngine.h"
+#include "TwinFetEngine.h"   // found via the include path (dsp/ or the project root)
 
 #include <chrono>
 #include <complex>

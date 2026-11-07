@@ -6,7 +6,7 @@
 #include <atomic>
 #include <vector>
 
-#include "../dsp/TwinFetEngine.h"
+#include "TwinFetEngine.h"   // found via the include path (dsp/ or the project root)
 
 namespace pid
 {

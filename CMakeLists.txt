@@ -43,11 +43,35 @@ juce_add_plugin(TwinFET
     VST3_CATEGORIES             Fx Dynamics
     AU_MAIN_TYPE                kAudioUnitType_Effect)
 
-target_sources(TwinFET PRIVATE
-    Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp)
+#-------------------------------------------------------------------------------
+# The sources may sit in Source/ dsp/ tests/ (as in the archive) or all together
+# in the project root (e.g. after a flat upload to GitHub) - both layouts build.
+function(twinfet_locate out name)
+    foreach(dir Source dsp tests .)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${dir}/${name}")
+            set(${out} "${CMAKE_CURRENT_SOURCE_DIR}/${dir}/${name}" PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    message(FATAL_ERROR "TwinFET: cannot find ${name} (looked in Source/, dsp/, tests/ and the project folder)")
+endfunction()
 
-target_include_directories(TwinFET PRIVATE Source dsp)
+set(TWINFET_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
+foreach(dir Source dsp)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${dir}")
+        list(APPEND TWINFET_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/${dir}")
+    endif()
+endforeach()
+
+twinfet_locate(TWINFET_PROCESSOR_CPP PluginProcessor.cpp)
+twinfet_locate(TWINFET_EDITOR_CPP    PluginEditor.cpp)
+twinfet_locate(TWINFET_ENGINE_H      TwinFetEngine.h)
+
+target_sources(TwinFET PRIVATE
+    ${TWINFET_PROCESSOR_CPP}
+    ${TWINFET_EDITOR_CPP})
+
+target_include_directories(TwinFET PRIVATE ${TWINFET_INCLUDE_DIRS})
 
 target_compile_definitions(TwinFET PUBLIC
     JUCE_WEB_BROWSER=0
@@ -71,6 +95,7 @@ target_link_libraries(TwinFET
 # Offline DSP measurement harness (no JUCE needed):  -DTWINFET_BUILD_TESTS=ON
 option(TWINFET_BUILD_TESTS "Build the offline DSP measurement harness" OFF)
 if(TWINFET_BUILD_TESTS)
-    add_executable(twinfet_measure tests/measure.cpp)
-    target_include_directories(twinfet_measure PRIVATE dsp)
+    twinfet_locate(TWINFET_MEASURE_CPP measure.cpp)
+    add_executable(twinfet_measure ${TWINFET_MEASURE_CPP})
+    target_include_directories(twinfet_measure PRIVATE ${TWINFET_INCLUDE_DIRS})
 endif()
