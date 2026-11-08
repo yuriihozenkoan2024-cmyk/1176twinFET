@@ -22,6 +22,12 @@ TwinFetProcessor::TwinFetProcessor()
     pLink     = apvts.getRawParameterValue (pid::link);
     pCompOff  = apvts.getRawParameterValue (pid::compOff);
     pNoise    = apvts.getRawParameterValue (pid::noise);
+    pOversampling = apvts.getRawParameterValue (pid::oversampling);
+
+    if (! apvts.state.hasProperty (uiprop::advancedOpen)) apvts.state.setProperty (uiprop::advancedOpen, false, nullptr);
+    if (! apvts.state.hasProperty (uiprop::showValues))   apvts.state.setProperty (uiprop::showValues, true, nullptr);
+
+    startTimerHz (5);   // picks up oversampling changes on the message thread
 }
 
 //==============================================================================
@@ -95,6 +101,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout TwinFetProcessor::createLayo
                     StringArray { "GR", "+4", "+8", "Input" }, 0,
                     AudioParameterChoiceAttributes().withAutomatable (false)));
 
+    // Auto = 4x up to 50 kHz, 2x up to 100 kHz, 1x above. Changing it changes the latency, so not automatable.
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { pid::oversampling, 1 }, "Oversampling",
+                    StringArray { "Auto", "1x", "2x", "4x", "8x", "16x" }, 0,
+                    AudioParameterChoiceAttributes().withAutomatable (false)));
+
     return layout;
 }
 
@@ -122,8 +133,14 @@ twinfet::Params TwinFetProcessor::readParams() const
 void TwinFetProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     const int channels = juce::jlimit (1, 2, getTotalNumOutputChannels());
+    lastSampleRate = sampleRate;
+    lastBlockSize  = samplesPerBlock;
+    lastChannels   = channels;
+    engineOsChoice = juce::roundToInt (pOversampling->load());
+    engine.setOversamplingChoice (engineOsChoice);
     engine.setParams (readParams());
     engine.prepare (sampleRate, samplesPerBlock, channels);
+    activeOversampling.store (engine.getOversamplingFactor());
     setLatencySamples (engine.getLatencySamples());
 
     for (auto& line : bypassLine)
@@ -138,6 +155,34 @@ void TwinFetProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 void TwinFetProcessor::reset()
 {
     engine.reset();
+}
+
+//==============================================================================
+void TwinFetProcessor::timerCallback()
+{
+    if (lastSampleRate <= 0.0)
+        return;
+    const int choice = juce::roundToInt (pOversampling->load());
+    if (choice != engineOsChoice)
+        applyOversampling (choice);
+}
+
+void TwinFetProcessor::applyOversampling (int choice)
+{
+    suspendProcessing (true);
+    {
+        const juce::ScopedLock sl (getCallbackLock());   // wait for a block that is still running
+        engineOsChoice = choice;
+        engine.setOversamplingChoice (choice);
+        engine.setParams (readParams());
+        engine.prepare (lastSampleRate, lastBlockSize, lastChannels);
+        for (auto& line : bypassLine)
+            line.assign ((size_t) juce::jmax (1, engine.getLatencySamples()), 0.0f);
+        bypassPos = 0;
+        activeOversampling.store (engine.getOversamplingFactor());
+    }
+    setLatencySamples (engine.getLatencySamples());
+    suspendProcessing (false);
 }
 
 bool TwinFetProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const

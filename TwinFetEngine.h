@@ -47,7 +47,8 @@ struct Params
 struct Voicing
 {
     // ---- static curve (per ratio button): threshold dBFS, ratio, knee width dB
-    static constexpr double thresholdDb[5] = { -18.0, -14.0, -13.0, -12.0, -20.0 };
+    // spacing between the ratios from bench measurements of a 1176LN (onset of compression vs. ratio)
+    static constexpr double thresholdDb[5] = { -18.0, -13.6, -12.0, -9.8, -20.0 };
     static constexpr double ratioValue[5]  = {   4.0,   8.0,  12.0,  20.0,  16.0 };
     static constexpr double kneeDb[5]      = {  12.0,   9.0,   7.0,   6.0,   4.0 };
 
@@ -79,12 +80,12 @@ public:
     {
         fs        = sampleRate;
         nCh       = std::max (1, std::min (2, numChannels));
-        osFactor  = fs <= 50000.0 ? 4 : (fs <= 100000.0 ? 2 : 1);
+        osFactor  = oversamplingFactorFor (osChoice, fs);
         fsOs      = fs * osFactor;
         (void) maxBlockSize;
 
         for (auto& o : os)
-            o.prepare (fs, osFactor);
+            o.prepare (fs, osFactor, chunk);
         for (auto& b : osBuf)
             b.assign ((size_t) (chunk * osFactor), 0.0f);
 
@@ -119,6 +120,18 @@ public:
 
     int getLatencySamples() const noexcept { return latency; }
     int getOversamplingFactor() const noexcept { return osFactor; }
+
+    /** 0 = auto (4x up to 50 kHz, 2x up to 100 kHz, then 1x), 1..5 = 1x, 2x, 4x, 8x, 16x.
+        Takes effect at the next prepare() (it reallocates, so not on the audio thread). */
+    void setOversamplingChoice (int choice) noexcept { osChoice = std::max (0, std::min (5, choice)); }
+    int getOversamplingChoice() const noexcept { return osChoice; }
+
+    static int oversamplingFactorFor (int choice, double sampleRate) noexcept
+    {
+        if (choice <= 0)
+            return sampleRate <= 50000.0 ? 4 : (sampleRate <= 100000.0 ? 2 : 1);
+        return 1 << (std::min (5, choice) - 1);
+    }
 
     void setParams (const Params& p)
     {
@@ -500,19 +513,22 @@ private:
         }
         else // ANALOG
         {
-            k.fetD2 = blue ? 0.014 : 0.006;
-            k.fetD3 = blue ? 0.005 : 0.003;
-            // Black: low-noise bipolar preamp / Blue: FET preamp, ~5 dB hotter -> earlier, 2nd-heavy saturation
-            k.preAmp.set  (blue ? 1.10 : 0.60, blue ? 0.09 : 0.035);
-            k.lineAmp.set (blue ? 0.75 : 0.55, blue ? 0.10 : 0.050);
-            k.noiseRms = c.noise ? dbToGain (blue ? -76.0 : -82.0) : 0.0;
-            k.humAmp   = c.noise ? dbToGain (blue ? -88.0 : -94.0) : 0.0;
+            // Calibrated against the published LN figures: < 0.5 % THD with limiting (50 Hz..15 kHz, 1.1 s
+            // release), +22 dBm out (= 0 dBFS here) at <= 0.5 % THD, S/N > 81 dB with the input at threshold.
+            // BLUE (the earlier generation) is deliberately dirtier and noisier.
+            k.fetD2 = blue ? 0.011 : 0.0034;
+            k.fetD3 = blue ? 0.004 : 0.0018;
+            // Black: low-noise bipolar preamp / Blue: FET preamp, hotter -> earlier, 2nd-heavy saturation
+            k.preAmp.set  (blue ? 0.85 : 0.36, blue ? 0.085 : 0.030);
+            k.lineAmp.set (blue ? 0.42 : 0.21, blue ? 0.080 : 0.030);
+            k.noiseRms = c.noise ? dbToGain (blue ? -89.0 : -97.5) : 0.0;
+            k.humAmp   = c.noise ? dbToGain (blue ? -101.0 : -110.0) : 0.0;
             for (auto& ch : p.ch)
             {
-                ch.tIn.set (30.0, fsOs, 2.0);
+                ch.tIn.set (30.0, fsOs, blue ? 2.0 : 2.6);
                 ch.hpIn.setHighpass (blue ? 7.0 : 6.0, 0.55, fsOs);   // overall response about -1 dB at 20 Hz
                 ch.lpIn.setLowpass (std::min (60000.0, 0.45 * fsOs), 0.65, fsOs);
-                ch.tOut.set (25.0, fsOs, blue ? 1.40 : 1.60);
+                ch.tOut.set (25.0, fsOs, blue ? 1.30 : 3.00);
                 ch.hpOut.setHighpass (5.0, 0.55, fsOs);
                 ch.lpOut.setLowpass (std::min (blue ? 38000.0 : 50000.0, 0.45 * fsOs), blue ? 0.65 : 0.60, fsOs);
             }
@@ -821,7 +837,8 @@ private:
             hum = k.humAmp * (p.humS + 0.45 * s2 + 0.3 * s3);
         }
 
-        const double fetAmt = c.all ? 4.0 : 1.0;   // ALL: bias points shift, the FET works much less linearly
+        // ALL: bias points shift and the FET works far less linearly (the famous grit)
+        const double fetAmt = c.all ? (c.revision == revBlue ? 5.0 : 8.0) : 1.0;
         const double invRef = 1.0 / Voicing::fetRefLevel;
         double out[2] = { 0.0, 0.0 };
         for (int ch = 0; ch < nc; ++ch)
@@ -860,9 +877,9 @@ private:
     int computeLatency()
     {
         if (osFactor == 1) return 0;
-        Oversampler t;
-        t.prepare (fs, osFactor);
         const int N = 4096;
+        Oversampler t;
+        t.prepare (fs, osFactor, N);
         std::vector<float> imp ((size_t) N, 0.0f), up ((size_t) (N * osFactor)), dn ((size_t) N);
         imp[0] = 1.0f;
         t.upsample (imp.data(), up.data(), N);
@@ -890,7 +907,7 @@ private:
     static constexpr int chunk = 256;
 
     double fs = 48000.0, fsOs = 192000.0;
-    int osFactor = 4, nCh = 2, latency = 0;
+    int osFactor = 4, osChoice = 0, nCh = 2, latency = 0;
     std::array<Oversampler, 2> os;
     std::array<std::vector<float>, 2> osBuf;
 
