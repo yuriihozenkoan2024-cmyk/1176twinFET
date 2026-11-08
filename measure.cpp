@@ -301,6 +301,60 @@ static void testAlias (double fs)
 }
 
 //------------------------------------------------------------------------------
+// 4b. Oversampling choices: aliasing, latency and CPU for 1x..16x
+static double worstAliasDbc (std::vector<float>& x, int n, int seg, double f0, double fs)
+{
+    auto w = bhWindow (seg);
+    const size_t st = (size_t) (n - seg);
+    const double a1 = toneAmp (x, st, seg, f0, fs, w);
+    double worst = 0.0;
+    const double binHz = fs / seg;
+    for (int b = 20; b < seg / 2 - 20; b += 7)
+    {
+        const double fr = b * binHz;
+        bool nearHarm = false;
+        for (int k = 1; k * f0 < 0.5 * fs; ++k)
+            if (std::fabs (fr - k * f0) < 40.0 * binHz) nearHarm = true;
+        if (nearHarm || fr < 30.0) continue;
+        worst = std::max (worst, toneAmp (x, st, seg, fr, fs, w));
+    }
+    return gainToDb (worst / a1);
+}
+
+static void testOversampling (double fs)
+{
+    FILE* f = openCsv ("oversampling.csv", "choice,factor,mode,rev,latency_samples,worst_alias_dbc,cpu_percent_stereo");
+    const int seg = 32768;
+    const double f0 = binFreq (9100.0, fs, seg);
+    for (int choice = 1; choice <= 5; ++choice)
+        for (int mode : { (int) modeFat, (int) modeAnalog })
+        {
+            const int rev = revBlue;
+            Params p = baseParams (mode, rev, ratio4);
+            p.inputDb = 12.0f; p.attack = 3.0f; p.release = 4.0f;
+            if (mode == modeAnalog) p.outputDb = 6.0f;
+            Engine e; e.setOversamplingChoice (choice); e.prepare (fs, 512, 1); e.setParams (p);
+            const int n = (int) (0.5 * fs) + seg;
+            auto x = sine (f0, -3.0, fs, n);
+            runEngine (e, x);
+            const double alias = worstAliasDbc (x, n, seg, f0, fs);
+
+            Engine c; c.setOversamplingChoice (choice); c.prepare (fs, 512, 2); c.setParams (p);
+            const int m = (int) (5.0 * fs);
+            std::mt19937 rng (3);
+            std::normal_distribution<float> nd (0.0f, 0.15f);
+            std::vector<float> L ((size_t) m), R ((size_t) m);
+            for (int i = 0; i < m; ++i) { L[(size_t) i] = nd (rng); R[(size_t) i] = nd (rng); }
+            const auto t0 = std::chrono::high_resolution_clock::now();
+            runEngine (c, L, &R, 256);
+            const auto t1 = std::chrono::high_resolution_clock::now();
+            const double cpu = 100.0 * std::chrono::duration<double> (t1 - t0).count() / 5.0;
+            std::fprintf (f, "%d,%d,%d,%d,%d,%.1f,%.2f\n", choice, e.getOversamplingFactor(), mode, rev, e.getLatencySamples(), alias, cpu);
+        }
+    std::fclose (f);
+}
+
+//------------------------------------------------------------------------------
 // 5. Small-signal frequency response (impulse at -60 dBFS)
 static void testFreq (double fs)
 {
@@ -547,6 +601,7 @@ int main (int argc, char** argv)
     if (what == "timing" || what == "all") testTiming (fs);
     if (what == "thd" || what == "all")    testThd (fs);
     if (what == "alias" || what == "all")  testAlias (fs);
+    if (what == "os" || what == "all")     testOversampling (fs);
     if (what == "freq" || what == "all")   testFreq (fs);
     if (what == "cpu" || what == "all")    testCpu (fs);
     int failures = 0;

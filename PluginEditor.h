@@ -74,13 +74,26 @@ private:
     TwinLook& look;
 };
 
-/** Faceted mode lamp; its colour follows the mode. */
+/** Faceted mode lamp with the mode's name printed next to it; the lamp colour follows the mode. */
 class JewelLamp final : public juce::Component
 {
 public:
     explicit JewelLamp (TwinLook& l) : look (l) { setInterceptsMouseClicks (false, false); }
     void paint (juce::Graphics&) override;
     static constexpr float pad = 7.0f;   // base units around layout::jewel() for the glow
+    juce::String modeName;
+private:
+    TwinLook& look;
+};
+
+/** Metal pull tab that opens and closes the ADVANCED drawer. */
+class DrawerPull final : public juce::Button
+{
+public:
+    explicit DrawerPull (TwinLook& l) : juce::Button ("advanced"), look (l) {}
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    bool open = false;
+    static constexpr float pad = 5.0f;
 private:
     TwinLook& look;
 };
@@ -89,21 +102,22 @@ private:
 class Readout final : public juce::Component
 {
 public:
-    Readout (TwinLook& l, int numCells, const char* unitUtf8, float brightness)
-        : look (l), cells (numCells), unit (juce::String::fromUTF8 (unitUtf8)), intensity (brightness)
+    Readout (TwinLook& l, int numCells, const char* unitUtf8, float brightness, const char* captionText = "")
+        : look (l), cells (numCells), unit (juce::String::fromUTF8 (unitUtf8)), caption (captionText), intensity (brightness)
     {
         setInterceptsMouseClicks (false, false);
     }
+    bool hasCaption() const { return caption.isNotEmpty(); }
     void setValue (const juce::String& v, bool unitOn = true)
     {
         if (v != value || unitOn != unitLit) { value = v; unitLit = unitOn; repaint(); }
     }
     void paint (juce::Graphics&) override;
-    static constexpr float pad = 2.0f;   // base units around the window (room for its lip)
+    static constexpr float pad = 4.0f;   // base units around the window (room for its bezel and shadow)
 private:
     TwinLook& look;
     int cells;
-    juce::String unit, value;
+    juce::String unit, caption, value;
     bool unitLit = true;
     float intensity;
 };
@@ -125,7 +139,8 @@ private:
     juce::Image face;
     int faceMeter = -1;
     uint32_t faceLamp = 0;
-    bool faceLight = false;
+    bool faceLight = false, faceCentre = false;
+    float faceWear = -1.0f;
 };
 
 //==============================================================================
@@ -142,6 +157,10 @@ public:
 private:
     void timerCallback() override;
     void refreshSelectors();
+    void setDrawerOpen (bool open);
+    void setShowValues (bool show);
+    void updateSizeLimits();
+    void updateVisibility();
     void setupKnob (KnobSlider&, bool big, const juce::String& tooltip, Readout& readout,
                     std::function<void (Readout&, double)> show);
     juce::Rectangle<int> scaled (const twinui::Rect& r, float pad = 0.0f) const;
@@ -152,21 +171,25 @@ private:
 
     PanelArt panelArt { look };
     JewelLamp jewelLamp { look };
+    DrawerPull drawerPull { look };
     KnobSlider inputKnob, outputKnob, attackKnob, releaseKnob, mixKnob, hpfKnob;
     Readout inputRead { look, 4, "dB", 0.85f }, outputRead { look, 4, "dB", 0.85f },
             attackRead { look, 3, "\xc2\xb5s", 0.85f }, releaseRead { look, 4, "ms", 0.85f },
             mixRead { look, 3, "%", 0.85f }, hpfRead { look, 3, "Hz", 0.85f },
-            grRead { look, 4, "dB", 1.0f }, outRead { look, 4, "VU", 1.0f };
+            grRead { look, 4, "dB", 1.0f, "GAIN REDUCTION" }, outRead { look, 4, "VU", 1.0f, "OUTPUT LEVEL" };
     std::array<LitButton, 5> ratioButtons;
     std::array<LitButton, 3> modeButtons;
     std::array<LitButton, 2> revButtons;
     std::array<LitButton, 4> meterButtons;
-    LitButton linkButton, compOffButton, noiseButton;
+    std::array<LitButton, 6> osButtons;
+    LitButton linkButton, compOffButton, noiseButton, valuesButton;
     VuMeter vu { look };
     juce::TooltipWindow tooltipWindow { this, 650 };
 
-    int ratioIndex = 0, modeIndex = 2, revIndex = 0, meterIndex = 0;
-    int paintedRevision = -1;
+    int ratioIndex = 0, modeIndex = 2, revIndex = 0, meterIndex = 0, osIndex = 0;
+    int paintedRevision = -1, shownOsFactor = 0;
+    float paintedWear = -1.0f;
+    bool drawerOpen = false, showValues = true;
     int frame = 0;
 
     // attachments last: destroyed first
@@ -174,7 +197,7 @@ private:
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<SliderAttachment> inputAtt, outputAtt, attackAtt, releaseAtt, mixAtt, hpfAtt;
     std::unique_ptr<ButtonAttachment> linkAtt, compOffAtt, noiseAtt;
-    std::unique_ptr<juce::ParameterAttachment> ratioAtt, modeAtt, revAtt, meterAtt;
+    std::unique_ptr<juce::ParameterAttachment> ratioAtt, modeAtt, revAtt, meterAtt, osAtt;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TwinFetEditor)
 };

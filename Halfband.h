@@ -10,6 +10,8 @@
 // see exactly the same filters.
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <vector>
 
@@ -171,76 +173,76 @@ private:
 class Oversampler
 {
 public:
-    void prepare (double baseRate, int factor)
+    static constexpr int maxStages = 4;   // up to 16x
+
+    /** factor is rounded up to a power of two (1..16); maxBlock = most low-rate samples per call. */
+    void prepare (double baseRate, int factor, int maxBlock = 256)
     {
-        osFactor = factor;
-        if (factor >= 2)
+        osFactor = 1;
+        stages = 0;
+        while (osFactor < factor && stages < maxStages) { osFactor *= 2; ++stages; }
+
+        // every stage keeps 0..20 kHz (or 0.45 fs) flat and rejects images by >100 dB;
+        // the later stages run at higher rates, so their transition bands are wide and cheap
+        const double pass = std::min (20000.0, 0.45 * baseRate);
+        for (int k = 0; k < stages; ++k)
         {
-            // Stage 1 keeps 0..20 kHz (or 0.45 fs) flat and rejects images by >100 dB.
-            const double pass = std::min (20000.0, 0.45 * baseRate);
-            const double t1   = std::max (0.01, 0.5 - pass / baseRate);
-            st1.init (HalfbandDesigner::design (110.0, t1));
+            const double stageRate = baseRate * (double) (1 << k);
+            st[(size_t) k].init (HalfbandDesigner::design (110.0, std::max (0.01, 0.5 - pass / stageRate)));
         }
-        if (factor >= 4)
-        {
-            const double pass = std::min (20000.0, 0.45 * baseRate);
-            const double t2   = std::max (0.01, 0.5 - pass / (2.0 * baseRate));
-            st2.init (HalfbandDesigner::design (110.0, t2));
-        }
+        for (int k = 0; k < maxStages; ++k)
+            tmp[(size_t) k].assign (k < stages - 1 ? (size_t) maxBlock << (k + 1) : 0, 0.0f);
         reset();
     }
 
-    void reset() { st1.reset(); st2.reset(); }
+    void reset() { for (auto& s : st) s.reset(); }
 
     int factor() const noexcept { return osFactor; }
 
     /** in: n low-rate samples; out: n * factor high-rate samples. */
     void upsample (const float* in, float* out, int n) noexcept
     {
-        if (osFactor == 1) { for (int i = 0; i < n; ++i) out[i] = in[i]; return; }
-        if (osFactor == 2)
+        if (stages == 0) { std::copy (in, in + n, out); return; }
+        const float* src = in;
+        int len = n;
+        for (int k = 0; k < stages; ++k)
         {
-            for (int i = 0; i < n; ++i)
+            float* dst = (k == stages - 1) ? out : tmp[(size_t) k].data();
+            auto& f = st[(size_t) k];
+            for (int i = 0; i < len; ++i)
             {
                 double a, b;
-                st1.up (in[i], a, b);
-                out[2 * i] = (float) a; out[2 * i + 1] = (float) b;
+                f.up (src[i], a, b);
+                dst[2 * i] = (float) a;
+                dst[2 * i + 1] = (float) b;
             }
-            return;
-        }
-        for (int i = 0; i < n; ++i)
-        {
-            double a, b, c0, c1, c2, c3;
-            st1.up (in[i], a, b);
-            st2.up (a, c0, c1);
-            st2.up (b, c2, c3);
-            float* o = out + 4 * i;
-            o[0] = (float) c0; o[1] = (float) c1; o[2] = (float) c2; o[3] = (float) c3;
+            src = dst;
+            len *= 2;
         }
     }
 
     /** in: n * factor high-rate samples; out: n low-rate samples. */
     void downsample (const float* in, float* out, int n) noexcept
     {
-        if (osFactor == 1) { for (int i = 0; i < n; ++i) out[i] = in[i]; return; }
-        if (osFactor == 2)
+        if (stages == 0) { std::copy (in, in + n, out); return; }
+        const float* src = in;
+        int len = n << stages;
+        for (int k = stages - 1; k >= 0; --k)
         {
-            for (int i = 0; i < n; ++i)
-                out[i] = (float) st1.down (in[2 * i], in[2 * i + 1]);
-            return;
-        }
-        for (int i = 0; i < n; ++i)
-        {
-            const float* s = in + 4 * i;
-            const double a = st2.down (s[0], s[1]);
-            const double b = st2.down (s[2], s[3]);
-            out[i] = (float) st1.down (a, b);
+            float* dst = (k == 0) ? out : tmp[(size_t) (k - 1)].data();
+            auto& f = st[(size_t) k];
+            const int outLen = len / 2;
+            for (int i = 0; i < outLen; ++i)
+                dst[i] = (float) f.down (src[2 * i], src[2 * i + 1]);
+            src = dst;
+            len = outLen;
         }
     }
 
 private:
-    int osFactor = 1;
-    Halfband2x st1, st2;
+    int osFactor = 1, stages = 0;
+    std::array<Halfband2x, maxStages> st;
+    std::array<std::vector<float>, maxStages> tmp;
 };
 
 } // namespace twinfet

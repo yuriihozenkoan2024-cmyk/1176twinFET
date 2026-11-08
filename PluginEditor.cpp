@@ -8,7 +8,7 @@ namespace
 {
     juce::String ua (const char* utf8) { return juce::String::fromUTF8 (utf8); }
 
-    /** twinui canvas adapter on top of juce::Graphics. Draws in base units (1000 x 470). */
+    /** twinui canvas adapter on top of juce::Graphics. Draws in base units (1000 wide). */
     class JuceCanvas
     {
     public:
@@ -150,7 +150,8 @@ void TwinLook::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int
     const float cy = ((float) y + 0.5f * (float) height) / scale;
     const float knobW = (float) juce::jmin (width, height) / scale - 2.0f * twinui::knobPad;
     const bool big = (bool) slider.getProperties().getWithDefault ("big", false);
-    twinui::knob (cv, cx, cy, twinui::knobRadius (knobW), startAngle + sliderPos * (endAngle - startAngle), big);
+    const auto seed = (uint32_t) (int) slider.getProperties().getWithDefault ("seed", 1);
+    twinui::knob (cv, cx, cy, twinui::knobRadius (knobW), startAngle + sliderPos * (endAngle - startAngle), big, palette.wear, seed);
 }
 
 void TwinLook::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&,
@@ -162,8 +163,13 @@ void TwinLook::drawButtonBackground (juce::Graphics& g, juce::Button& b, const j
     const twinui::Rect r { pad, pad, bw - 2.0f * pad, bh - 2.0f * pad };
     const juce::String label = b.getButtonText();
     const juce::String sub = b.getProperties().getWithDefault ("sub", juce::String()).toString();
-    twinui::litButton (cv, r, b.getToggleState(), highlighted && b.isEnabled(), down && b.isEnabled(),
-                       palette, label.toRawUTF8(), sub.toRawUTF8());
+    const int style = (int) b.getProperties().getWithDefault ("style", 0);   // 0 lit lamp, 1 white cap, 2 black cap
+    if (style == 0)
+        twinui::litButton (cv, r, b.getToggleState(), highlighted && b.isEnabled(), down && b.isEnabled(),
+                           palette, label.toRawUTF8(), sub.toRawUTF8());
+    else
+        twinui::capButton (cv, r, b.getToggleState(), highlighted && b.isEnabled(), down && b.isEnabled(),
+                           palette, label.toRawUTF8(), sub.toRawUTF8(), style == 1);
 }
 
 //==============================================================================
@@ -188,16 +194,28 @@ void PanelArt::paint (juce::Graphics& g)
 void JewelLamp::paint (juce::Graphics& g)
 {
     JuceCanvas cv (g, look);
+    const auto j = twinui::layout::jewel(), n = twinui::layout::modeName();
+    const float ox = j.x - pad, oy = j.y - pad;   // this component's origin in base units
+    twinui::jewel (cv, j.cx() - ox, j.cy() - oy, 0.36f * j.w, look.palette.jewel);
+    twinui::ink (cv, look.palette, modeName.toRawUTF8(), { n.x - ox, n.y - oy, n.w, n.h }, 18.0f, -1, 0.18f);
+}
+
+void DrawerPull::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    JuceCanvas cv (g, look);
     const float w = (float) getWidth() / look.scale, h = (float) getHeight() / look.scale;
-    twinui::jewel (cv, 0.5f * w, 0.5f * h, 0.36f * twinui::layout::jewel().w, look.palette.jewel);
+    twinui::drawerPull (cv, { pad, pad, w - 2.0f * pad, h - 2.0f * pad }, open, highlighted, down, look.palette);
 }
 
 void Readout::paint (juce::Graphics& g)
 {
     JuceCanvas cv (g, look);
     const float w = (float) getWidth() / look.scale, h = (float) getHeight() / look.scale;
-    const twinui::Rect r { pad, pad, w - 2.0f * pad, h - 2.0f * pad };
+    const float capH = hasCaption() ? twinui::layout::readoutCaptionH : 0.0f;
+    const twinui::Rect r { pad, pad, w - 2.0f * pad, h - 2.0f * pad - capH };
     twinui::ledReadout (cv, r, value.toRawUTF8(), unit.toRawUTF8(), look.palette, cells, unitLit, intensity);
+    if (hasCaption())
+        twinui::readoutCaption (cv, look.palette, { r.x, r.bottom() + 3.0f, r.w, 12.0f }, caption.toRawUTF8());
 }
 
 void VuMeter::tick (float target, float dt)
@@ -225,7 +243,8 @@ void VuMeter::paint (juce::Graphics& g)
     const int pw = juce::jmax (1, juce::roundToInt ((float) getWidth() * k));
     const int ph = juce::jmax (1, juce::roundToInt ((float) getHeight() * k));
     if (face.isNull() || face.getWidth() != pw || face.getHeight() != ph || faceMeter != meterIndex
-        || faceLamp != look.palette.meterLamp || faceLight != look.palette.lightPanel)
+        || faceLamp != look.palette.meterLamp || faceLight != look.palette.lightPanel
+        || faceCentre != look.palette.centerLamp || ! juce::approximatelyEqual (faceWear, look.palette.wear))
     {
         face = juce::Image (juce::Image::ARGB, pw, ph, true);
         juce::Graphics fg (face);
@@ -235,6 +254,8 @@ void VuMeter::paint (juce::Graphics& g)
         faceMeter = meterIndex;
         faceLamp = look.palette.meterLamp;
         faceLight = look.palette.lightPanel;
+        faceCentre = look.palette.centerLamp;
+        faceWear = look.palette.wear;
     }
     g.setColour (juce::Colours::black);
     g.drawImage (face, getLocalBounds().toFloat());
@@ -250,6 +271,8 @@ TwinFetEditor::TwinFetEditor (TwinFetProcessor& p)
     setLookAndFeel (&look);
     addAndMakeVisible (panelArt);
     addAndMakeVisible (jewelLamp);
+    drawerOpen = (bool) proc.apvts.state.getProperty (uiprop::advancedOpen, false);
+    showValues = (bool) proc.apvts.state.getProperty (uiprop::showValues, true);
 
     for (auto* r : { &inputRead, &outputRead, &attackRead, &releaseRead, &mixRead, &hpfRead, &grRead, &outRead })
         addAndMakeVisible (*r);
@@ -301,6 +324,7 @@ TwinFetEditor::TwinFetEditor (TwinFetProcessor& p)
     {
         auto& b = ratioButtons[(size_t) i];
         b.setButtonText (ratioNames[i]);
+        b.getProperties().set ("style", 1);   // white caps
         b.setTooltip (i < 4 ? ua ("Ratio. Вищий ratio — вищий поріг і жорсткіше коліно.")
                             : ua ("ALL («всі кнопки»): ~16:1 і більше, зміщення робочих точок, лаг атаки на транзієнтах, перекомпресія і багато бруду."));
         b.onClick = [this, i] { if (ratioAtt != nullptr) ratioAtt->setValueAsCompleteGesture ((float) i); };
@@ -339,7 +363,7 @@ TwinFetEditor::TwinFetEditor (TwinFetProcessor& p)
     }
 
     // meter
-    const char* meterNames[] = { "GR", "OUT +4", "OUT +8", "INPUT" };
+    const char* meterNames[] = { "GR", "+4", "+8", "INPUT" };
     const char* meterTips[]  = { "Стрілка показує подавлення (GR).",
                                  "Вихідний рівень: 0 VU = −18 dBFS.",
                                  "Вихідний рівень: 0 VU = −14 dBFS.",
@@ -348,6 +372,7 @@ TwinFetEditor::TwinFetEditor (TwinFetProcessor& p)
     {
         auto& b = meterButtons[(size_t) i];
         b.setButtonText (meterNames[i]);
+        b.getProperties().set ("style", 2);   // black caps
         b.setTooltip (ua (meterTips[i]));
         b.onClick = [this, i] { if (meterAtt != nullptr) meterAtt->setValueAsCompleteGesture ((float) i); };
         addAndMakeVisible (b);
@@ -369,6 +394,38 @@ TwinFetEditor::TwinFetEditor (TwinFetProcessor& p)
     compOffAtt = std::make_unique<ButtonAttachment> (proc.apvts, pid::compOff, compOffButton);
     noiseAtt   = std::make_unique<ButtonAttachment> (proc.apvts, pid::noise,   noiseButton);
 
+    // oversampling
+    const char* osNames[] = { "AUTO", "1\xc3\x97", "2\xc3\x97", "4\xc3\x97", "8\xc3\x97", "16\xc3\x97" };
+    const char* osTips[]  = {
+        "Оверсемплінг AUTO: 4× до 50 кГц, 2× до 100 кГц, вище — без нього. Під кнопкою видно, що зараз працює.",
+        "Без оверсемплінгу: найменша затримка й навантаження, але насичення і «роздування» дають аліасинг (≈ −30 дБ на гарячих верхах).",
+        "2×: аліасинг ≈ −93 дБ, затримка 3 семпли.",
+        "4×: аліасинг нижче −100 дБ (рекомендовано), затримка 4 семпли.",
+        "8×: майже не чистіше за 4×, удвічі більше навантаження на процесор.",
+        "16×: для перфекціоністів — ще вчетверо більше навантаження, на слух як 4×."
+    };
+    for (int i = 0; i < 6; ++i)
+    {
+        auto& b = osButtons[(size_t) i];
+        b.setButtonText (juce::String::fromUTF8 (osNames[i]));
+        b.getProperties().set ("style", 2);
+        b.setTooltip (ua (osTips[i]));
+        b.onClick = [this, i] { if (osAtt != nullptr) osAtt->setValueAsCompleteGesture ((float) i); };
+        addAndMakeVisible (b);
+    }
+
+    // displays on/off
+    valuesButton.setButtonText ("VALUES");
+    valuesButton.getProperties().set ("style", 1);
+    valuesButton.setTooltip (ua ("Показати або сховати всі цифрові індикатори — лишаються тільки ручки і стрілка."));
+    valuesButton.onClick = [this] { setShowValues (! showValues); };
+    addAndMakeVisible (valuesButton);
+
+    // the drawer pull
+    drawerPull.setTooltip (ua ("ADVANCED: режим, ревізія, оверсемплінг, mix, SC HPF, перемикачі і показ цифр."));
+    drawerPull.onClick = [this] { setDrawerOpen (! drawerOpen); };
+    addAndMakeVisible (drawerPull);
+
     addAndMakeVisible (vu);
 
     ratioAtt = std::make_unique<juce::ParameterAttachment> (*proc.apvts.getParameter (pid::ratio),
@@ -379,16 +436,18 @@ TwinFetEditor::TwinFetEditor (TwinFetProcessor& p)
                    [this] (float v) { revIndex = juce::roundToInt (v); refreshSelectors(); });
     meterAtt = std::make_unique<juce::ParameterAttachment> (*proc.apvts.getParameter (pid::meter),
                    [this] (float v) { meterIndex = juce::roundToInt (v); refreshSelectors(); });
+    osAtt    = std::make_unique<juce::ParameterAttachment> (*proc.apvts.getParameter (pid::oversampling),
+                   [this] (float v) { osIndex = juce::roundToInt (v); refreshSelectors(); });
     ratioAtt->sendInitialUpdate();
     modeAtt->sendInitialUpdate();
     revAtt->sendInitialUpdate();
     meterAtt->sendInitialUpdate();
+    osAtt->sendInitialUpdate();
 
     setResizable (true, true);
-    setResizeLimits ((int) (twinui::kW * 0.7f), (int) (twinui::kH * 0.7f), (int) (twinui::kW * 2.0f), (int) (twinui::kH * 2.0f));
-    if (auto* c = getConstrainer())
-        c->setFixedAspectRatio ((double) twinui::kW / (double) twinui::kH);
-    setSize ((int) twinui::kW, (int) twinui::kH);
+    updateSizeLimits();
+    setSize ((int) twinui::kW, (int) (drawerOpen ? twinui::kFullH : twinui::kMainH));
+    updateVisibility();
 
     startTimerHz (60);
 }
@@ -409,6 +468,7 @@ void TwinFetEditor::setupKnob (KnobSlider& k, bool big, const juce::String& tool
     k.getProperties().set ("big", big);
     k.setTooltip (tooltip);
     k.setPopupDisplayEnabled (true, false, this);
+    k.getProperties().set ("seed", (int) (twinui::hashText (tooltip.toRawUTF8()) & 0x7fffffff));
     k.onValueChange = [&k, &readout, show = std::move (show)] { show (readout, k.getValue()); };
     addAndMakeVisible (k);
 }
@@ -419,20 +479,69 @@ void TwinFetEditor::refreshSelectors()
     for (int i = 0; i < 3; ++i) modeButtons[(size_t) i].setToggleState (i == modeIndex, juce::dontSendNotification);
     for (int i = 0; i < 2; ++i) revButtons[(size_t) i].setToggleState (i == revIndex, juce::dontSendNotification);
     for (int i = 0; i < 4; ++i) meterButtons[(size_t) i].setToggleState (i == meterIndex, juce::dontSendNotification);
+    for (int i = 0; i < 6; ++i) osButtons[(size_t) i].setToggleState (i == osIndex, juce::dontSendNotification);
+    valuesButton.setToggleState (showValues, juce::dontSendNotification);
+    valuesButton.getProperties().set ("sub", showValues ? "ON" : "OFF");
 
-    // revision = panel material, mode = lamp colours (VU back-light + jewel)
+    // revision = panel material; mode = lamp colours, meter lamp and (ANALOG) a well-used unit
     look.palette = twinui::paletteFor (revIndex, modeIndex);
-    if (revIndex != paintedRevision)
+    if (revIndex != paintedRevision || ! juce::approximatelyEqual (look.palette.wear, paintedWear))
     {
         paintedRevision = revIndex;
-        panelArt.repaint();   // the only expensive repaint; mode changes don't touch the panel
+        paintedWear = look.palette.wear;
+        panelArt.repaint();   // the only expensive repaint
     }
     vu.setMeterIndex (meterIndex);
     vu.repaint();
+    const char* modeNames[] = { "FAT", "CLEAN", "ANALOG" };
+    jewelLamp.modeName = modeNames[juce::jlimit (0, 2, modeIndex)];
     jewelLamp.repaint();
     noiseButton.setEnabled (modeIndex == 2);
     noiseButton.setAlpha (modeIndex == 2 ? 1.0f : 0.45f);
     repaint();
+}
+
+void TwinFetEditor::updateSizeLimits()
+{
+    const float h = drawerOpen ? twinui::kFullH : twinui::kMainH;
+    if (auto* c = getConstrainer())
+        c->setFixedAspectRatio ((double) twinui::kW / (double) h);
+    setResizeLimits ((int) (twinui::kW * 0.7f), (int) (h * 0.7f), (int) (twinui::kW * 2.0f), (int) (h * 2.0f));
+}
+
+void TwinFetEditor::setDrawerOpen (bool open)
+{
+    drawerOpen = open;
+    proc.apvts.state.setProperty (uiprop::advancedOpen, open, nullptr);
+    const float scaleNow = getWidth() > 0 ? (float) getWidth() / twinui::kW : 1.0f;
+    updateSizeLimits();
+    setSize (juce::roundToInt (twinui::kW * scaleNow),
+             juce::roundToInt ((drawerOpen ? twinui::kFullH : twinui::kMainH) * scaleNow));
+    updateVisibility();
+}
+
+void TwinFetEditor::setShowValues (bool show)
+{
+    showValues = show;
+    proc.apvts.state.setProperty (uiprop::showValues, show, nullptr);
+    updateVisibility();
+    refreshSelectors();
+}
+
+void TwinFetEditor::updateVisibility()
+{
+    drawerPull.open = drawerOpen;
+    drawerPull.repaint();
+    for (auto* r : { &inputRead, &outputRead, &attackRead, &releaseRead, &grRead, &outRead })
+        r->setVisible (showValues);
+    mixRead.setVisible (showValues && drawerOpen);
+    hpfRead.setVisible (showValues && drawerOpen);
+    for (auto& b : modeButtons) b.setVisible (drawerOpen);
+    for (auto& b : revButtons)  b.setVisible (drawerOpen);
+    for (auto& b : osButtons)   b.setVisible (drawerOpen);
+    for (juce::Component* c : { (juce::Component*) &valuesButton, (juce::Component*) &mixKnob, (juce::Component*) &hpfKnob,
+                                (juce::Component*) &linkButton, (juce::Component*) &compOffButton, (juce::Component*) &noiseButton })
+        c->setVisible (drawerOpen);
 }
 
 juce::Rectangle<int> TwinFetEditor::scaled (const twinui::Rect& r, float pad) const
@@ -452,8 +561,13 @@ void TwinFetEditor::resized()
     s = (float) getWidth() / twinui::kW;
     look.scale = s;
 
-    panelArt.setBounds (getLocalBounds());
-    jewelLamp.setBounds (scaled (L::jewel(), JewelLamp::pad));
+    panelArt.setBounds (0, 0, getWidth(), juce::roundToInt (twinui::kFullH * s));
+    {
+        const auto j = L::jewel(), n = L::modeName();
+        const float pd = JewelLamp::pad;
+        jewelLamp.setBounds (scaled ({ j.x - pd, j.y - pd, (n.right() - j.x) + 2.0f * pd, j.h + 2.0f * pd }));
+    }
+    drawerPull.setBounds (scaled (L::advancedHandle(), DrawerPull::pad));
     vu.setBounds (scaled (L::vu()));
 
     inputKnob.setBounds   (scaled (L::input(),   twinui::knobPad));
@@ -469,8 +583,9 @@ void TwinFetEditor::resized()
     releaseRead.setBounds (scaled (L::releaseReadout(), Readout::pad));
     mixRead.setBounds     (scaled (L::mixReadout(),     Readout::pad));
     hpfRead.setBounds     (scaled (L::hpfReadout(),     Readout::pad));
-    grRead.setBounds      (scaled (L::grReadout(),      Readout::pad));
-    outRead.setBounds     (scaled (L::outReadout(),     Readout::pad));
+    auto withCaption = [] (twinui::Rect r) { r.h += twinui::layout::readoutCaptionH; return r; };
+    grRead.setBounds      (scaled (withCaption (L::grReadout()),  Readout::pad));
+    outRead.setBounds     (scaled (withCaption (L::outReadout()), Readout::pad));
 
     auto placeButton = [this] (LitButton& b, const twinui::Rect& r)
     {
@@ -481,6 +596,8 @@ void TwinFetEditor::resized()
     for (int i = 0; i < 3; ++i) placeButton (modeButtons[(size_t) i],  L::modeButton (i));
     for (int i = 0; i < 2; ++i) placeButton (revButtons[(size_t) i],   L::revButton (i));
     for (int i = 0; i < 4; ++i) placeButton (meterButtons[(size_t) i], L::meterButton (i));
+    for (int i = 0; i < 6; ++i) placeButton (osButtons[(size_t) i],    L::osButton (i));
+    placeButton (valuesButton,  L::valuesButton());
     placeButton (linkButton,    L::toggle (0));
     placeButton (compOffButton, L::toggle (1));
     placeButton (noiseButton,   L::toggle (2));
@@ -509,6 +626,14 @@ void TwinFetEditor::timerCallback()
         target = std::pow (10.0f, (vuDb - 3.0f) / 20.0f);
     }
     vu.tick (target, 1.0f / 60.0f);
+
+    const int osNow = proc.activeOversampling.load (std::memory_order_relaxed);
+    if (osNow != shownOsFactor)
+    {
+        shownOsFactor = osNow;
+        osButtons[0].getProperties().set ("sub", juce::String (osNow) + juce::String::fromUTF8 ("\xc3\x97"));
+        osButtons[0].repaint();
+    }
 
     if (++frame % 3 == 0)
     {

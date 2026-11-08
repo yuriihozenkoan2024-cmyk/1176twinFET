@@ -1,8 +1,9 @@
 // TwinFET — panel artwork and layout (header only, no JUCE dependency).
 //
-// Everything is drawn in base units on a 1000 x 470 canvas. The drawing goes through a tiny
-// "canvas" adapter G so exactly the same code renders inside the plugin (JUCE adapter in
-// PluginEditor.cpp) and in the offline preview (cairo adapter in tests/ui_preview.cpp).
+// Everything is drawn in base units: the faceplate is 1000 x 360 and the ADVANCED drawer adds
+// 180 below it. The drawing goes through a tiny "canvas" adapter G so exactly the same code renders
+// inside the plugin (JUCE adapter in PluginEditor.cpp) and in the offline preview (cairo adapter in
+// tests/ui_preview.cpp).
 //
 // Adapter G must provide:
 //   save() restore() clipRect(x,y,w,h)
@@ -24,7 +25,9 @@ namespace twinui
 {
 
 constexpr float kW = 1000.0f;
-constexpr float kH = 470.0f;
+constexpr float kMainH = 360.0f;               // the faceplate
+constexpr float kDrawerH = 180.0f;             // the ADVANCED drawer that slides out below it
+constexpr float kFullH = kMainH + kDrawerH;
 constexpr float kPi = 3.14159265358979f;
 constexpr float kStartAngle = kPi * 1.25f;
 constexpr float kEndAngle   = kPi * 2.75f;
@@ -53,41 +56,49 @@ inline float py (float cy, float r, float a) { return cy - r * std::cos (a); }
 /** Every control position, in base units. */
 namespace layout
 {
-    inline Rect leftEar()  { return { 0.0f, 0.0f, 34.0f, kH }; }
-    inline Rect rightEar() { return { kW - 34.0f, 0.0f, 34.0f, kH }; }
+    inline Rect leftEar()  { return { 0.0f, 0.0f, 34.0f, kMainH }; }
+    inline Rect rightEar() { return { kW - 34.0f, 0.0f, 34.0f, kMainH }; }
 
-    // header: MODE and REVISION selectors, mode lamp
-    inline Rect jewel()            { return { 368.0f, 21.0f, 24.0f, 24.0f }; }
-    inline Rect modeButton (int i) { return { 452.0f + 84.0f * (float) i, 14.0f, 78.0f, 38.0f }; }
-    inline Rect revButton (int i)  { return { 818.0f + 68.0f * (float) i, 18.0f, 64.0f, 30.0f }; }
+    // ---- faceplate header: the mode lamp with the mode's name, the two main read-outs
+    inline Rect jewel()      { return { 412.0f, 20.0f, 24.0f, 24.0f }; }
+    inline Rect modeName()   { return { 444.0f, 18.0f, 130.0f, 28.0f }; }
+    inline Rect grReadout()  { return { 606.0f, 9.0f, 146.0f, 36.0f }; }
+    inline Rect outReadout() { return { 774.0f, 9.0f, 146.0f, 36.0f }; }
+    constexpr float readoutCaptionH = 13.0f;   // caption printed under the big read-outs
 
-    // meter block
+    // ---- meter block
     inline Rect vu()       { return { 54.0f, 74.0f, 328.0f, 212.0f }; }
     inline Rect meterButton (int i) { return { 112.0f + 68.0f * (float) i, 298.0f, 62.0f, 26.0f }; }
 
-    // input / output
+    // ---- input / output
     inline Rect input()    { return { 422.0f, 126.0f, 128.0f, 128.0f }; }
     inline Rect output()   { return { 596.0f, 126.0f, 128.0f, 128.0f }; }
     inline Rect inputReadout()  { return { 450.0f, 266.0f, 72.0f, 21.0f }; }
     inline Rect outputReadout() { return { 624.0f, 266.0f, 72.0f, 21.0f }; }
     inline Rect ratioButton (int i) { return { 466.0f + 56.0f * (float) i, 298.0f, 50.0f, 26.0f }; }
 
-    // attack / release (stacked)
+    // ---- attack / release (stacked)
     inline Rect attack()   { return { 822.0f, 104.0f, 56.0f, 56.0f }; }
     inline Rect release()  { return { 822.0f, 236.0f, 56.0f, 56.0f }; }
     inline Rect attackReadout()  { return { 816.0f, 175.0f, 68.0f, 19.0f }; }
     inline Rect releaseReadout() { return { 816.0f, 307.0f, 68.0f, 19.0f }; }
 
-    // utility strip
-    inline Rect strip()    { return { 50.0f, 344.0f, 900.0f, 114.0f }; }
-    inline Rect mix()      { return { 94.0f, 369.0f, 52.0f, 52.0f }; }
-    inline Rect hpf()      { return { 204.0f, 369.0f, 52.0f, 52.0f }; }
-    inline Rect mixReadout() { return { 88.0f, 435.0f, 64.0f, 19.0f }; }
-    inline Rect hpfReadout() { return { 198.0f, 435.0f, 64.0f, 19.0f }; }
-    inline Rect toggle (int i) { return { 314.0f + 100.0f * (float) i, 380.0f, 88.0f, 34.0f }; }  // LINK, COMP OFF, NOISE
+    // ---- the pull that opens the ADVANCED drawer
+    inline Rect advancedHandle() { return { 434.0f, 333.0f, 132.0f, 21.0f }; }
 
-    inline Rect grReadout()  { return { 636.0f, 372.0f, 140.0f, 40.0f }; }
-    inline Rect outReadout() { return { 790.0f, 372.0f, 140.0f, 40.0f }; }
+    // ---- ADVANCED drawer (below the faceplate)
+    constexpr float dy = kMainH;
+    inline Rect drawer()           { return { 30.0f, dy + 2.0f, kW - 60.0f, kDrawerH - 8.0f }; }
+    inline Rect modeButton (int i) { return { 64.0f + 84.0f * (float) i, dy + 30.0f, 78.0f, 38.0f }; }
+    inline Rect revButton (int i)  { return { 346.0f + 70.0f * (float) i, dy + 34.0f, 64.0f, 30.0f }; }
+    inline Rect osButton (int i)   { return { 512.0f + 50.0f * (float) i, dy + 35.0f, 44.0f, 28.0f }; }
+    inline Rect valuesButton()     { return { 840.0f, dy + 33.0f, 96.0f, 32.0f }; }
+    inline Rect mix()              { return { 80.0f, dy + 102.0f, 52.0f, 52.0f }; }
+    inline Rect hpf()              { return { 246.0f, dy + 102.0f, 52.0f, 52.0f }; }
+    inline Rect mixReadout()       { return { 146.0f, dy + 118.0f, 60.0f, 19.0f }; }
+    inline Rect hpfReadout()       { return { 312.0f, dy + 118.0f, 60.0f, 19.0f }; }
+    inline Rect toggle (int i)     { return { 404.0f + 98.0f * (float) i, dy + 106.0f, 88.0f, 34.0f }; }   // LINK, COMP OFF, NOISE
+    inline Rect plate()            { return { 786.0f, dy + 106.0f, 150.0f, 34.0f }; }
 }
 
 //==============================================================================
@@ -108,7 +119,7 @@ inline uint32_t mix (uint32_t a, uint32_t b, float t)
 }
 
 //==============================================================================
-/** Panel material (revision) and lamp colours (mode). */
+/** Panel material (revision) and lamps / wear (mode). */
 struct Palette
 {
     bool lightPanel = false;
@@ -116,10 +127,12 @@ struct Palette
     float grainStrength = 0.075f;
     uint32_t ink = 0xebe9e3d6, inkDim = 0xc4b9b2a3;       // silkscreen (slightly translucent)
     uint32_t meterLamp = 0xffffd79a;                      // VU back-light (mode)
+    bool centerLamp = false;                              // ANALOG: one bulb behind the middle of the meter
     uint32_t jewel = 0xffff3b2b;                          // mode lamp (mode)
     uint32_t lampHot = 0xfffff2d6, lampEdge = 0xffeab063; // lit push buttons (incandescent)
     uint32_t led = 0xffffcf8e;                            // seven-segment read-outs (pale amber LEDs)
     uint32_t ledFilter = 0xff120d09;                      // tinted filter window behind them
+    float wear = 0.0f;                                    // 0 = new, 1 = well used (ANALOG)
 };
 
 inline Palette paletteFor (int revision, int mode)
@@ -138,7 +151,8 @@ inline Palette paletteFor (int revision, int mode)
     {
         case 0:  p.meterLamp = 0xffff9a3c; p.jewel = 0xffff8a12; break;   // FAT: deep amber
         case 1:  p.meterLamp = 0xffd6e6ff; p.jewel = 0xffcfe2ff; break;   // CLEAN: cool white
-        default: p.meterLamp = 0xffffd27a; p.jewel = 0xffe8241a; break;   // ANALOG: classic incandescent, red jewel
+        default: p.meterLamp = 0xffffcf7a; p.jewel = 0xffe8241a;          // ANALOG: one incandescent bulb, red jewel,
+                 p.centerLamp = true; p.wear = 1.0f; break;               //         and a unit that has seen some sessions
     }
     return p;
 }
@@ -294,9 +308,197 @@ void screw (G& g, float cx, float cy, float r)
 }
 
 //==============================================================================
-/** Black phenolic skirted knob with a spun-aluminium insert. */
+/** Deterministic random numbers for wear marks: the same marks on every computer. */
+struct WearRng
+{
+    uint32_t s;
+    explicit WearRng (uint32_t seed) : s (seed * 2654435761u + 0x6d2b79f5u) { if (s == 0) s = 1; next(); }
+    uint32_t next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+    float uni() { return (float) (next() & 0xffffffu) / 16777216.0f; }
+    float range (float a, float b) { return a + (b - a) * uni(); }
+};
+
+inline uint32_t hashText (const char* t)
+{
+    uint32_t h = 2166136261u;
+    for (; t != nullptr && *t != 0; ++t) { h ^= (uint8_t) *t; h *= 16777619u; }
+    return h;
+}
+
+/** A thin, slightly bowed scratch; its deeper middle part catches more light. Angle in radians, x right, y down. */
 template <class G>
-void knob (G& g, float cx, float cy, float r, float angle, bool big)
+void scratch (G& g, float x, float y, float ang, float len, float bow, float width, uint32_t colour, float alpha)
+{
+    const float ca = std::cos (ang), sa = std::sin (ang);
+    auto path = [&] (float t0, float t1)
+    {
+        g.newPath();
+        for (int i = 0; i <= 6; ++i)
+        {
+            const float t = t0 + (t1 - t0) * (float) i / 6.0f;
+            const float d = t * len, off = bow * len * 4.0f * t * (1.0f - t);
+            const float X = x + ca * d - sa * off, Y = y + sa * d + ca * off;
+            if (i == 0) g.moveTo (X, Y); else g.lineTo (X, Y);
+        }
+    };
+    path (0.0f, 1.0f);
+    g.setColour (withAlpha (colour, 0.5f * alpha));
+    g.strokePath (width);
+    path (0.2f, 0.75f);
+    g.setColour (withAlpha (colour, alpha));
+    g.strokePath (0.6f * width);
+}
+
+/** Dust, hairline scratches and a finger smudge on glass or a lens (the caller clips to it). */
+template <class G>
+void glassWear (G& g, Rect b, uint32_t seed, float amount)
+{
+    if (amount <= 0.0f) return;
+    WearRng rnd (seed);
+    const float area = b.w * b.h;
+    const int specks = (int) (amount * (2.0f + area / 240.0f));
+    for (int i = 0; i < specks; ++i)
+    {
+        const float s = rnd.range (0.22f, 0.7f);
+        g.setColour (withAlpha (0xffe9e5dd, rnd.range (0.10f, 0.30f)));
+        g.fillEllipse (b.x + rnd.uni() * b.w - s, b.y + rnd.uni() * b.h - s, 2.0f * s, 2.0f * s * rnd.range (0.6f, 1.0f));
+    }
+    const int lines = (int) (amount * (1.0f + area / 1500.0f));
+    for (int i = 0; i < lines; ++i)
+    {
+        const float len = rnd.range (0.15f, 0.7f) * b.w;
+        scratch (g, b.x + rnd.uni() * (b.w - 0.3f * len), b.y + rnd.range (0.1f, 0.9f) * b.h, rnd.range (-0.35f, 0.35f), len,
+                 rnd.range (-0.03f, 0.03f), rnd.range (0.25f, 0.45f), 0xfff2efe8, rnd.range (0.05f, 0.10f) * std::min (1.6f, amount));
+    }
+    if (amount > 0.3f)   // a soft fingerprint smudge
+    {
+        const float a = std::min (1.5f, amount);
+        const float r = rnd.range (0.25f, 0.45f) * std::min (b.w, 2.0f * b.h);
+        const float cx = b.x + rnd.range (0.2f, 0.8f) * b.w, cy = b.y + rnd.range (0.3f, 0.7f) * b.h;
+        const GradStop sm[] = { { 0.0f, withAlpha (0xffffffff, 0.035f * a) }, { 0.7f, withAlpha (0xffffffff, 0.012f * a) }, { 1.0f, 0x00ffffff } };
+        g.setRadial (cx, cy, r, sm, 3);
+        g.fillEllipse (cx - r, cy - r, 2.0f * r, 2.0f * r);
+    }
+}
+
+//==============================================================================
+/** Satin chrome (frames, bezels), lit from the upper left. */
+template <class G>
+void chromeFill (G& g, Rect r, float radius)
+{
+    const GradStop s[] = { { 0.0f, 0xfff3f5f7 }, { 0.22f, 0xffc4c9cf }, { 0.5f, 0xff80868d }, { 0.78f, 0xff4b5056 }, { 1.0f, 0xff9ca2a9 } };
+    g.setLinear (r.x, r.y, r.x + 0.35f * r.w, r.bottom(), s, 5);
+    g.fillRoundRect (r.x, r.y, r.w, r.h, radius);
+    g.setColour (0x70ffffff);
+    g.line (r.x + radius, r.y + 0.45f, r.right() - radius, r.y + 0.45f, 0.7f);
+}
+
+/** Stainless button-head screw with a hex socket. */
+template <class G>
+void hexScrew (G& g, float cx, float cy, float r)
+{
+    const GradStop sh[] = { { 0.0f, 0x70000000 }, { 0.75f, 0x30000000 }, { 1.0f, 0x00000000 } };
+    g.setRadial (cx + 0.5f, cy + 0.9f, 1.5f * r, sh, 3);
+    g.fillEllipse (cx + 0.5f - 1.5f * r, cy + 0.9f - 1.5f * r, 3.0f * r, 3.0f * r);
+    const GradStop head[] = { { 0.0f, 0xfff4f5f7 }, { 0.35f, 0xffb8bdc3 }, { 0.75f, 0xff6c7178 }, { 1.0f, 0xff3d4146 } };
+    g.setRadial (cx - 0.4f * r, cy - 0.45f * r, 1.6f * r, head, 4);
+    g.fillEllipse (cx - r, cy - r, 2.0f * r, 2.0f * r);
+    g.setColour (0x66000000);
+    g.strokeEllipse (cx - r, cy - r, 2.0f * r, 2.0f * r, 0.5f);
+    const float s = 0.42f * r;
+    auto hex = [&] (float ox, float oy)
+    {
+        g.newPath();
+        for (int i = 0; i < 6; ++i)
+        {
+            const float a = (float) i * kPi / 3.0f + 0.3f;
+            const float X = cx + ox + s * std::cos (a), Y = cy + oy + s * std::sin (a);
+            if (i == 0) g.moveTo (X, Y); else g.lineTo (X, Y);
+        }
+        g.closePath();
+    };
+    hex (0.22f * r * 0.5f, 0.32f * r * 0.5f);   // lit lower wall of the socket
+    g.setColour (0x70ffffff);
+    g.fillPath();
+    hex (0.0f, 0.0f);
+    g.setColour (0xf0101114);
+    g.fillPath();
+}
+
+/** Polished rack handle: a round bar between two posts that stand off the ear. */
+template <class G>
+void rackHandle (G& g, float cx, float y0, float y1, const Palette& p)
+{
+    const float bw = 9.0f, pr = 7.0f;
+    for (int i = 4; i >= 1; --i)   // shadow on the ear: the handle stands about a centimetre off the panel
+    {
+        const float e = 1.2f * (float) i;
+        g.setColour (withAlpha (0xff000000, p.lightPanel ? 0.06f : 0.09f));
+        g.fillRoundRect (cx - 0.5f * bw + 4.0f - e, y0 + 5.0f - e, bw + 2.0f * e, (y1 - y0) + 2.0f * e, 0.5f * bw + e);
+    }
+    // the bar: a polished cylinder reflecting a bright window and a dark room
+    const GradStop cyl[] = { { 0.00f, 0xff2b2e32 }, { 0.14f, 0xff9097a0 }, { 0.30f, 0xfff8f9fb }, { 0.42f, 0xffcfd4da },
+                             { 0.62f, 0xff6c727a }, { 0.86f, 0xff25282c }, { 1.00f, 0xff5a5f66 } };
+    g.setLinear (cx - 0.5f * bw, 0.0f, cx + 0.5f * bw, 0.0f, cyl, 7);
+    g.fillRoundRect (cx - 0.5f * bw, y0, bw, y1 - y0, 0.5f * bw);
+    const GradStop env[] = { { 0.0f, 0x00ffffff }, { 0.3f, 0x16ffffff }, { 0.55f, 0x00ffffff }, { 0.85f, 0x18000000 }, { 1.0f, 0x00000000 } };
+    g.setLinear (0.0f, y0, 0.0f, y1, env, 5);
+    g.fillRoundRect (cx - 0.5f * bw, y0, bw, y1 - y0, 0.5f * bw);
+    for (const float postY : { y0, y1 })
+    {
+        const GradStop sh[] = { { 0.0f, 0x66000000 }, { 1.0f, 0x00000000 } };
+        g.setRadial (cx + 2.0f, postY + 3.0f, pr + 4.0f, sh, 2);
+        g.fillEllipse (cx + 2.0f - pr - 4.0f, postY + 3.0f - pr - 4.0f, 2.0f * (pr + 4.0f), 2.0f * (pr + 4.0f));
+        const GradStop face[] = { { 0.0f, 0xfffafbfc }, { 0.4f, 0xffc3c8ce }, { 0.85f, 0xff6a7077 }, { 1.0f, 0xff3a3e43 } };
+        g.setRadial (cx - 0.35f * pr, postY - 0.4f * pr, 1.7f * pr, face, 4);
+        g.fillEllipse (cx - pr, postY - pr, 2.0f * pr, 2.0f * pr);
+        g.setColour (0x55000000);
+        g.strokeEllipse (cx - pr, postY - pr, 2.0f * pr, 2.0f * pr, 0.6f);
+        hexScrew (g, cx, postY, 3.0f);
+    }
+}
+
+/** Small domed rivet. */
+template <class G>
+void rivet (G& g, float cx, float cy, float r)
+{
+    g.setColour (0x55000000);
+    g.fillEllipse (cx - r + 0.3f, cy - r + 0.5f, 2.0f * r, 2.0f * r);
+    const GradStop d[] = { { 0.0f, 0xfffbfcfd }, { 0.5f, 0xffaeb4bb }, { 1.0f, 0xff5c6168 } };
+    g.setRadial (cx - 0.35f * r, cy - 0.4f * r, 1.5f * r, d, 3);
+    g.fillEllipse (cx - r, cy - r, 2.0f * r, 2.0f * r);
+}
+
+/** Engraved serial plate. */
+template <class G>
+void serialPlate (G& g, Rect r)
+{
+    softShadow (g, r, 2.0f, 2.0f, 1.2f, 0.45f);
+    const GradStop pl[] = { { 0.0f, 0xffe4e7ea }, { 1.0f, 0xffa9afb6 } };
+    g.setLinear (r.x, r.y, r.x, r.bottom(), pl, 2);
+    g.fillRoundRect (r.x, r.y, r.w, r.h, 2.0f);
+    g.grain (r.x, r.y, r.w, r.h, 0, 1234u, 0.10f);
+    g.setColour (0x90ffffff);
+    g.line (r.x + 2.0f, r.y + 0.5f, r.right() - 2.0f, r.y + 0.5f, 0.7f);
+    g.setColour (0x80000000);
+    g.strokeRoundRect (r.x, r.y, r.w, r.h, 2.0f, 0.6f);
+    auto engrave = [&] (const char* t, float y, float size, float tracking)
+    {
+        g.setColour (0x70ffffff);
+        g.text (t, r.x + 10.0f, y + 0.6f, r.w - 20.0f, size + 2.0f, size, 0, tracking);
+        g.setColour (0xe0262a2e);
+        g.text (t, r.x + 10.0f, y, r.w - 20.0f, size + 2.0f, size, 0, tracking);
+    };
+    engrave ("TWINFET  MODEL TF-2", r.y + 4.0f, 11.0f, 0.14f);
+    engrave ("SER. No. 02417", r.bottom() - 15.0f, 9.5f, 0.18f);
+    rivet (g, r.x + 5.0f, r.cy(), 1.9f);
+    rivet (g, r.right() - 5.0f, r.cy(), 1.9f);
+}
+
+//==============================================================================
+/** Black phenolic skirted knob with a polished band and a spun-aluminium insert. */
+template <class G>
+void knob (G& g, float cx, float cy, float r, float angle, bool big, float wear = 0.0f, uint32_t seed = 1u)
 {
     // ambient + contact shadow (light from the upper left)
     {
@@ -318,13 +520,16 @@ void knob (G& g, float cx, float cy, float r, float angle, bool big)
         const float a = 2.0f * kPi * (float) i / (float) ribs;
         const float lit = 0.5f + 0.5f * std::cos (a + 0.75f);
         g.setColour (withAlpha (0xffffffff, 0.015f + 0.075f * lit * lit));
-        g.line (px (cx, r * 0.905f, a), py (cy, r * 0.905f, a), px (cx, r * 0.99f, a), py (cy, r * 0.99f, a), big ? 1.1f : 0.9f);
+        g.line (px (cx, r * 0.89f, a), py (cy, r * 0.89f, a), px (cx, r * 0.965f, a), py (cy, r * 0.965f, a), big ? 1.1f : 0.9f);
     }
-    // skirt chamfer: highlight upper left, shade lower right
-    g.setColour (0x2effffff);
-    g.newPath(); g.arc (cx, cy, r * 0.995f, -2.2f, 0.4f, true); g.strokePath (1.0f);
-    g.setColour (0x66000000);
-    g.newPath(); g.arc (cx, cy, r * 0.995f, 1.2f, 3.6f, true); g.strokePath (1.2f);
+
+    // polished metal band around the skirt
+    {
+        const GradStop band[] = { { 0.0f, 0xfff7f8fa }, { 0.3f, 0xffb4bac1 }, { 0.55f, 0xff50555b }, { 0.8f, 0xff8e949b }, { 1.0f, 0xffd5d9de } };
+        g.setLinear (cx - r, cy - r, cx + r, cy + r, band, 5);
+        const float br = r * 0.984f;
+        g.strokeEllipse (cx - br, cy - br, 2.0f * br, 2.0f * br, big ? 1.9f : 1.3f);
+    }
 
     // body
     const float t = r * 0.82f;
@@ -341,9 +546,9 @@ void knob (G& g, float cx, float cy, float r, float angle, bool big)
     const float pw = big ? 3.0f : 2.3f;
     g.setColour (0x99000000);
     g.line (px (cx, r * 0.55f, angle) + 0.5f, py (cy, r * 0.55f, angle) + 0.8f,
-            px (cx, r * 0.97f, angle) + 0.5f, py (cy, r * 0.97f, angle) + 0.8f, pw);
+            px (cx, r * 0.93f, angle) + 0.5f, py (cy, r * 0.93f, angle) + 0.8f, pw);
     g.setColour (0xffe9e4d8);
-    g.line (px (cx, r * 0.55f, angle), py (cy, r * 0.55f, angle), px (cx, r * 0.97f, angle), py (cy, r * 0.97f, angle), pw);
+    g.line (px (cx, r * 0.55f, angle), py (cy, r * 0.55f, angle), px (cx, r * 0.93f, angle), py (cy, r * 0.93f, angle), pw);
 
     // spun-aluminium insert
     const float c = r * 0.44f;
@@ -352,8 +557,7 @@ void knob (G& g, float cx, float cy, float r, float angle, bool big)
     const GradStop base[] = { { 0.0f, 0xffd9dce0 }, { 1.0f, 0xff8c9096 } };
     g.setLinear (cx - c, cy - c, cx + c, cy + c, base, 2);
     g.fillEllipse (cx - c, cy - c, 2.0f * c, 2.0f * c);
-    // anisotropic "bow-tie" highlight of spun metal
-    const int wedges = big ? 72 : 48;
+    const int wedges = big ? 72 : 48;   // anisotropic "bow-tie" highlight of spun metal
     for (int i = 0; i < wedges; ++i)
     {
         const float a0 = 2.0f * kPi * (float) i / (float) wedges;
@@ -369,22 +573,43 @@ void knob (G& g, float cx, float cy, float r, float angle, bool big)
         g.closePath();
         g.fillPath();
     }
-    // turning rings
-    for (int i = 1; i <= (big ? 10 : 7); ++i)
+    for (int i = 1; i <= (big ? 10 : 7); ++i)   // turning rings
     {
         const float rr = c * (float) i / (big ? 10.5f : 7.5f);
         g.setColour (withAlpha (i % 2 ? 0xffffffff : 0xff000000, i % 2 ? 0.07f : 0.05f));
         g.strokeEllipse (cx - rr, cy - rr, 2.0f * rr, 2.0f * rr, 0.6f);
     }
-    // chamfered edge
-    g.setColour (0x99ffffff);
+    g.setColour (0x99ffffff);   // chamfered edge
     g.newPath(); g.arc (cx, cy, c - 0.4f, -2.4f, 0.1f, true); g.strokePath (0.9f);
     g.setColour (0x99000000);
     g.newPath(); g.arc (cx, cy, c - 0.4f, 0.9f, 3.6f, true); g.strokePath (0.9f);
+
+    if (wear > 0.0f)
+    {
+        WearRng rnd (seed);
+        for (int i = 0; i < 4; ++i)   // paint chipped off the pointer
+        {
+            const float rr = r * rnd.range (0.58f, 0.9f), cr = rnd.range (0.45f, 1.1f) * (big ? 1.0f : 0.7f);
+            g.setColour (withAlpha (0xff151617, rnd.range (0.55f, 0.9f) * wear));
+            g.fillEllipse (px (cx, rr, angle) - cr + rnd.range (-0.5f, 0.5f), py (cy, rr, angle) - cr, 2.0f * cr, 2.0f * cr);
+        }
+        for (int i = 0; i < 10; ++i)   // the knurled rim polished by fingers
+        {
+            const float a0 = rnd.range (0.0f, 2.0f * kPi);
+            g.setColour (withAlpha (0xffffffff, 0.05f * wear));
+            g.newPath(); g.arc (cx, cy, r * 0.93f, a0, a0 + rnd.range (0.2f, 0.6f), true); g.strokePath (big ? 2.2f : 1.6f);
+        }
+        for (int i = 0; i < 9; ++i)    // swirl marks on the insert
+        {
+            const float a0 = rnd.range (0.0f, 2.0f * kPi), rr = c * rnd.range (0.3f, 0.92f);
+            g.setColour (withAlpha (i % 3 == 0 ? 0xff000000 : 0xffffffff, 0.12f * wear));
+            g.newPath(); g.arc (cx, cy, rr, a0, a0 + rnd.range (0.3f, 1.2f), true); g.strokePath (0.35f);
+        }
+    }
 }
 
 //==============================================================================
-/** Square illuminated push button: frosted lens with a printed legend, incandescent lamp. */
+/** Square illuminated push button: frosted lens with a printed legend, incandescent lamp, chrome bezel. */
 template <class G>
 void litButton (G& g, Rect b, bool on, bool hover, bool down, const Palette& p, const char* label, const char* sub)
 {
@@ -392,21 +617,18 @@ void litButton (G& g, Rect b, bool on, bool hover, bool down, const Palette& p, 
     const float rr = 2.5f;
 
     softShadow (g, b, rr, 3.0f, 1.6f, p.lightPanel ? 0.35f : 0.55f);
-
-    // bezel
-    const GradStop bez[] = { { 0.0f, 0xff434548 }, { 0.5f, 0xff222325 }, { 1.0f, 0xff111213 } };
-    g.setLinear (b.x, b.y, b.x, b.bottom(), bez, 3);
-    g.fillRoundRect (b.x, b.y, b.w, b.h, rr);
-    g.setColour (0x30ffffff);
-    g.line (b.x + rr, b.y + 0.5f, b.right() - rr, b.y + 0.5f, 1.0f);
-
-    // lens
+    chromeFill (g, b, rr);
     const Rect l { b.x + 2.5f, b.y + 2.5f, b.w - 5.0f, b.h - 5.0f };
+    g.setColour (0xf0060606);   // the gap between bezel and lens
+    g.fillRoundRect (l.x - 0.7f, l.y - 0.7f, l.w + 1.4f, l.h + 1.4f, rr - 0.5f);
+
+    uint32_t lensMid = 0xff8f8a80;
     if (on)
     {
         const GradStop lens[] = { { 0.0f, p.lampHot }, { 0.65f, mix (p.lampHot, p.lampEdge, 0.65f) }, { 1.0f, mix (p.lampEdge, 0xff6b4a22, 0.35f) } };
         g.setRadial (l.cx(), l.cy() + 0.15f * l.h, 0.62f * std::max (l.w, l.h), lens, 3);
         g.fillRoundRect (l.x, l.y, l.w, l.h, rr - 1.0f);
+        lensMid = mix (p.lampHot, p.lampEdge, 0.35f);
     }
     else
     {
@@ -416,9 +638,13 @@ void litButton (G& g, Rect b, bool on, bool hover, bool down, const Palette& p, 
         const GradStop inner[] = { { 0.0f, 0x00000000 }, { 1.0f, 0x30000000 } };   // dark lamp cavity behind the diffuser
         g.setRadial (l.cx(), l.cy(), 0.7f * std::max (l.w, l.h), inner, 2);
         g.fillRoundRect (l.x, l.y, l.w, l.h, rr - 1.0f);
+        if (p.wear > 0.0f)
+        {
+            g.setColour (withAlpha (0xffc8a060, 0.12f * p.wear));   // yellowed diffuser
+            g.fillRoundRect (l.x, l.y, l.w, l.h, rr - 1.0f);
+        }
     }
-    // frosted texture + inner edge
-    g.grain (l.x, l.y, l.w, l.h, 1, 77u, on ? 0.06f : 0.085f);
+    g.grain (l.x, l.y, l.w, l.h, 1, 77u, on ? 0.06f : 0.085f);   // frosted texture
     g.setColour (0x70000000);
     g.strokeRoundRect (l.x, l.y, l.w, l.h, rr - 1.0f, 0.8f);
     const GradStop gloss[] = { { 0.0f, 0x2affffff }, { 1.0f, 0x00ffffff } };
@@ -440,6 +666,138 @@ void litButton (G& g, Rect b, bool on, bool hover, bool down, const Palette& p, 
     {
         g.text (label, l.x, l.y, l.w, l.h, main, 0, 0.07f);
     }
+
+    if (p.wear > 0.0f)   // rubbed legend, scuffed lens
+    {
+        WearRng rnd (hashText (label) ^ 0x5bd1e995u);
+        for (int i = 0; i < 6; ++i)
+        {
+            const float rb = rnd.range (0.4f, 1.0f);
+            g.setColour (withAlpha (lensMid, rnd.range (0.45f, 0.8f) * p.wear));
+            g.fillEllipse (l.x + rnd.range (0.2f, 0.8f) * l.w - rb, l.y + rnd.range (0.25f, 0.75f) * l.h - rb, 2.0f * rb, 1.4f * rb);
+        }
+        g.save();
+        g.clipRect (l.x, l.y, l.w, l.h);
+        glassWear (g, l, hashText (label), 1.3f * p.wear);
+        g.restore();
+    }
+}
+
+//==============================================================================
+/** Unlit push-button cap (white or black) in a chrome bezel. Pressed or latched, it sinks deeper and darkens. */
+template <class G>
+void capButton (G& g, Rect b, bool engaged, bool hover, bool down, const Palette& p, const char* label, const char* sub, bool white)
+{
+    const float rr = 2.5f;
+    const bool in = engaged || down;
+    softShadow (g, b, rr, 3.0f, 1.6f, p.lightPanel ? 0.35f : 0.55f);
+    chromeFill (g, b, rr);
+    const Rect hole { b.x + 2.5f, b.y + 2.5f, b.w - 5.0f, b.h - 5.0f };
+    g.setColour (0xff040404);
+    g.fillRoundRect (hole.x, hole.y, hole.w, hole.h, rr - 1.0f);
+
+    // the cap: proud when released; pressed in, it sits deeper and lower, in the bezel's shadow
+    const float inset = in ? 1.4f : 0.5f;
+    const Rect c { hole.x + inset, hole.y + inset + (in ? 0.8f : 0.0f), hole.w - 2.0f * inset, hole.h - 2.0f * inset - (in ? 0.4f : 0.0f) };
+    uint32_t top = white ? 0xfff6f2e8 : 0xff3a3c40, bot = white ? 0xffd2cab8 : 0xff141517;
+    if (white && p.wear > 0.0f) { top = mix (top, 0xffe8d7b0, 0.35f * p.wear); bot = mix (bot, 0xffc0aa80, 0.30f * p.wear); }   // aged plastic
+    if (in)         { top = mix (top, 0xff000000, white ? 0.30f : 0.40f); bot = mix (bot, 0xff000000, white ? 0.30f : 0.40f); }
+    else if (hover) { top = mix (top, 0xffffffff, 0.08f); bot = mix (bot, 0xffffffff, 0.06f); }
+    const GradStop cap[] = { { 0.0f, top }, { 1.0f, bot } };
+    g.setLinear (c.x, c.y, c.x + 0.25f * c.w, c.bottom(), cap, 2);
+    g.fillRoundRect (c.x, c.y, c.w, c.h, 1.8f);
+    g.grain (c.x, c.y, c.w, c.h, 1, 991u + hashText (label) % 97u, white ? 0.035f : 0.05f);
+
+    // edges: lit top, shaded bottom; a pressed cap hardly catches any light
+    g.setColour (withAlpha (0xffffffff, in ? 0.08f : (white ? 0.75f : 0.22f)));
+    g.line (c.x + 1.8f, c.y + 0.6f, c.right() - 1.8f, c.y + 0.6f, 0.9f);
+    g.setColour (withAlpha (0xff000000, white ? 0.28f : 0.55f));
+    g.line (c.x + 1.8f, c.bottom() - 0.6f, c.right() - 1.8f, c.bottom() - 0.6f, 1.0f);
+    if (in)   // the bezel throws a shadow onto the sunken cap
+    {
+        const GradStop sh[] = { { 0.0f, 0x99000000 }, { 1.0f, 0x00000000 } };
+        g.setLinear (c.x, c.y, c.x, c.y + 0.4f * c.h, sh, 2);
+        g.fillRoundRect (c.x, c.y, c.w, 0.4f * c.h, 1.8f);
+        g.setLinear (c.x, c.y, c.x + 0.18f * c.w, c.y, sh, 2);
+        g.fillRoundRect (c.x, c.y, 0.18f * c.w, c.h, 1.8f);
+    }
+    else      // released caps are slightly domed
+    {
+        const GradStop dome[] = { { 0.0f, withAlpha (0xffffffff, white ? 0.30f : 0.10f) }, { 1.0f, 0x00ffffff } };
+        g.setRadial (c.x + 0.35f * c.w, c.y + 0.25f * c.h, 0.6f * c.w, dome, 2);
+        g.fillRoundRect (c.x, c.y, c.w, c.h, 1.8f);
+    }
+    if (! white && p.wear > 0.0f)   // fingers have polished the middle of the black caps
+    {
+        const GradStop pol[] = { { 0.0f, withAlpha (0xffffffff, 0.10f * p.wear) }, { 1.0f, 0x00ffffff } };
+        g.setRadial (c.cx(), c.cy(), 0.45f * c.w, pol, 2);
+        g.fillRoundRect (c.x, c.y, c.w, c.h, 1.8f);
+    }
+
+    // printed legend
+    const uint32_t legend = white ? (in ? 0xd8141414 : 0xe0181818) : (in ? 0xb0e3ddd0 : 0xe6ece7db);
+    const bool hasSub = sub != nullptr && sub[0] != 0;
+    const float main = hasSub ? std::fmin (14.0f, c.h * 0.44f) : std::fmin (14.0f, c.h * 0.56f);
+    g.setColour (legend);
+    if (hasSub)
+    {
+        g.text (label, c.x, c.y + c.h * 0.08f, c.w, c.h * 0.52f, main, 0, 0.07f);
+        g.setColour (withAlpha (legend, 0.7f));
+        g.text (sub, c.x, c.y + c.h * 0.56f, c.w, c.h * 0.36f, main * 0.7f, 0, 0.10f);
+    }
+    else
+    {
+        g.text (label, c.x, c.y, c.w, c.h, main, 0, 0.07f);
+    }
+
+    if (p.wear > 0.0f)   // legend rubbed, a few scuffs
+    {
+        WearRng rnd (hashText (label) ^ 0x9e3779b9u);
+        const uint32_t base = mix (top, bot, 0.5f);
+        for (int i = 0; i < 6; ++i)
+        {
+            const float rb = rnd.range (0.4f, 1.0f);
+            g.setColour (withAlpha (base, rnd.range (0.5f, 0.85f) * p.wear));
+            g.fillEllipse (c.x + rnd.range (0.2f, 0.8f) * c.w - rb, c.y + rnd.range (0.3f, 0.7f) * c.h - rb, 2.0f * rb, 1.4f * rb);
+        }
+        g.save();
+        g.clipRect (c.x, c.y, c.w, c.h);
+        glassWear (g, c, hashText (label), 0.8f * p.wear);
+        g.restore();
+    }
+}
+
+//==============================================================================
+/** Brushed-metal pull tab that opens and closes the ADVANCED drawer. */
+template <class G>
+void drawerPull (G& g, Rect b, bool open, bool hover, bool down, const Palette& p)
+{
+    if (down) b.y += 0.6f;
+    softShadow (g, b, 3.0f, 2.5f, 1.5f, p.lightPanel ? 0.3f : 0.5f);
+    const GradStop plate[] = { { 0.0f, hover ? 0xfff6f7f9 : 0xffe9ecef }, { 0.5f, hover ? 0xffbcc2c9 : 0xffadb3ba }, { 1.0f, 0xff6c7279 } };
+    g.setLinear (b.x, b.y, b.x, b.bottom(), plate, 3);
+    g.fillRoundRect (b.x, b.y, b.w, b.h, 3.0f);
+    g.grain (b.x, b.y, b.w, b.h, 0, 5150u, 0.10f);
+    g.setColour (0x80ffffff);
+    g.line (b.x + 3.0f, b.y + 0.5f, b.right() - 3.0f, b.y + 0.5f, 0.8f);
+    g.setColour (0x70000000);
+    g.strokeRoundRect (b.x, b.y, b.w, b.h, 3.0f, 0.7f);
+
+    // engraved legend (dark cut with a lit lower lip) and an arrow
+    const Rect t { b.x + 12.0f, b.y, b.w - 34.0f, b.h };
+    g.setColour (0x60ffffff);
+    g.text ("ADVANCED", t.x, t.y + 0.6f, t.w, t.h, 12.5f, 0, 0.20f);
+    g.setColour (0xe0202326);
+    g.text ("ADVANCED", t.x, t.y, t.w, t.h, 12.5f, 0, 0.20f);
+    const float ax = b.right() - 15.0f, ay = b.cy();
+    g.newPath();
+    if (open) { g.moveTo (ax - 4.5f, ay + 2.5f); g.lineTo (ax + 4.5f, ay + 2.5f); g.lineTo (ax, ay - 3.0f); }
+    else      { g.moveTo (ax - 4.5f, ay - 2.5f); g.lineTo (ax + 4.5f, ay - 2.5f); g.lineTo (ax, ay + 3.0f); }
+    g.closePath();
+    g.setColour (0xe0202326);
+    g.fillPath();
+    rivet (g, b.x + 6.0f, b.cy(), 1.8f);
+    rivet (g, b.right() - 6.0f, b.cy(), 1.8f);
 }
 
 //==============================================================================
@@ -503,7 +861,8 @@ namespace detail
     }
 }
 
-/** One seven-segment digit with decimal point: lit segments glow a little, unlit ones stay faintly visible. */
+/** One seven-segment digit with decimal point: lit segments glow a little, unlit ones stay faintly visible.
+    Real LED dies are never identical; on a well-used unit (wear) some segments have aged noticeably. */
 template <class G>
 void segmentCell (G& g, float x0, float y0, float w, float h, int mask, bool point, const Palette& p, float intensity, uint32_t seed)
 {
@@ -525,6 +884,7 @@ void segmentCell (G& g, float x0, float y0, float w, float h, int mask, bool poi
 
     const uint32_t ghost = withAlpha (mix (p.led, 0xff8a8a8a, 0.6f), 0.075f);
     const uint32_t core = mix (p.led, 0xffffffff, 0.18f);
+    const float spread = 0.05f + 0.10f * p.wear;
     for (int i = 0; i < 7; ++i)
     {
         if ((mask & (1 << i)) == 0)
@@ -534,14 +894,16 @@ void segmentCell (G& g, float x0, float y0, float w, float h, int mask, bool poi
             g.fillPath();
             continue;
         }
-        const float a = intensity * (0.90f + 0.05f * detail::dieSpread (seed * 8u + (uint32_t) i));
+        float a = intensity * (0.90f + spread * detail::dieSpread (seed * 8u + (uint32_t) i));
+        if (p.wear > 0.0f && detail::dieSpread (seed * 13u + (uint32_t) i * 7u + 3u) < -0.82f)
+            a *= 1.0f - 0.4f * p.wear;   // a tired segment
         // soft light spill through the filter: several faint, widening layers
         const float widths[] = { 3.2f, 2.3f, 1.5f, 0.8f };
         const float alphas[] = { 0.030f, 0.040f, 0.055f, 0.075f };
         for (int k = 0; k < 4; ++k)
         {
             detail::segPoly (g, x0, y0, h, slant, seg[i], 6);
-            g.setColour (withAlpha (p.led, alphas[k] * intensity));
+            g.setColour (withAlpha (p.led, alphas[k] * a));
             g.strokePath (widths[k] * t);
         }
         detail::segPoly (g, x0, y0, h, slant, seg[i], 6);
@@ -569,19 +931,21 @@ void segmentCell (G& g, float x0, float y0, float w, float h, int mask, bool poi
     g.fillEllipse (dx - dr, dy - dr, 2.0f * dr, 2.0f * dr);
 }
 
-/** Seven-segment LED read-out behind a tinted filter window, with the unit printed on the filter.
+/** Seven-segment LED read-out: separate digit modules behind a tinted filter glass in a polished bezel,
+    the unit printed on the glass. The glass carries a little dust and a few hairlines (more on a worn unit).
     'value' may contain digits, '-', '.', and the letters segmentMask() knows; it is right-aligned in 'cells'. */
 template <class G>
 void ledReadout (G& g, Rect b, const char* value, const char* unit, const Palette& p, int cells,
                  bool unitLit = true, float intensity = 1.0f)
 {
-    const float r = 2.0f;
+    const float r = 2.0f, bz = 1.8f;
 
-    // window cut into the panel: the lower edge catches the light, the cut itself is dark
-    g.setColour (p.lightPanel ? 0x50ffffff : 0x18ffffff);
-    g.fillRoundRect (b.x - 0.8f, b.y - 0.4f, b.w + 1.6f, b.h + 1.6f, r + 0.8f);
+    // polished bezel, slightly raised off the panel
+    const Rect fr { b.x - bz, b.y - bz, b.w + 2.0f * bz, b.h + 2.0f * bz };
+    softShadow (g, fr, r + bz, 1.6f, 1.0f, p.lightPanel ? 0.30f : 0.45f);
+    chromeFill (g, fr, r + bz);
     g.setColour (0xf0000000);
-    g.fillRoundRect (b.x - 0.8f, b.y - 0.8f, b.w + 1.6f, b.h + 1.4f, r + 0.8f);
+    g.fillRoundRect (b.x - 0.5f, b.y - 0.5f, b.w + 1.0f, b.h + 1.0f, r + 0.4f);
     const GradStop bg[] = { { 0.0f, mix (p.ledFilter, 0xff000000, 0.45f) }, { 1.0f, p.ledFilter } };
     g.setLinear (b.x, b.y, b.x, b.bottom(), bg, 2);
     g.fillRoundRect (b.x, b.y, b.w, b.h, r);
@@ -599,6 +963,16 @@ void ledReadout (G& g, Rect b, const char* value, const char* unit, const Palett
     const float digitsW = pitch * (float) cells - (pitch - w);
     const float x0 = b.cx() - 0.5f * (digitsW + gapU + unitW);
     const float y0 = b.cy() - 0.5f * h;
+
+    // each digit is its own little LED package, a touch darker than the filter
+    for (int i = 0; i < cells; ++i)
+    {
+        const float mx = x0 + pitch * (float) i - 0.12f * h, my = y0 - 0.14f * h, mw = pitch - 0.06f * h;
+        g.setColour (0xff070504);
+        g.fillRoundRect (mx, my, mw, 1.28f * h, 0.6f);
+        g.setColour (0x0dffffff);
+        g.line (mx + 0.5f, my + 0.4f, mx + mw - 0.5f, my + 0.4f, 0.4f);
+    }
 
     char ch[16];
     bool dp[16];
@@ -623,20 +997,42 @@ void ledReadout (G& g, Rect b, const char* value, const char* unit, const Palett
         segmentCell (g, x0 + pitch * (float) i, y0, w, h, mask, point, p, intensity, (uint32_t) (i * 31 + cells * 7) + (uint32_t) (b.x * 3.0f));
     }
 
-    // unit legend printed on the filter
+    // unit legend printed on the glass (partly rubbed off on a worn unit)
     if (hasUnit)
     {
+        const Rect ur { x0 + digitsW + gapU, y0 + h - 0.95f * unitSize, unitW + 0.5f * unitSize, unitSize };
         g.setColour (unitLit ? 0x96d6cbb6 : 0x3cd6cbb6);
-        g.text (unit, x0 + digitsW + gapU, y0 + h - 0.95f * unitSize, unitW + 0.5f * unitSize, unitSize, unitSize, -1, 0.04f);
+        g.text (unit, ur.x, ur.y, ur.w, ur.h, unitSize, -1, 0.04f);
+        if (p.wear > 0.0f)
+        {
+            WearRng rnd (hashText (unit) + (uint32_t) b.x);
+            for (int i = 0; i < 3; ++i)
+            {
+                const float rb = rnd.range (0.4f, 0.9f);
+                g.setColour (withAlpha (p.ledFilter, 0.75f * p.wear));
+                g.fillEllipse (ur.x + rnd.range (0.0f, 0.6f) * ur.w - rb, ur.y + rnd.range (0.3f, 0.8f) * ur.h - rb, 2.0f * rb, 1.5f * rb);
+            }
+        }
     }
 
-    // filter glass: slight reflection on the upper part, darker lower part, bezel shadow
+    // the glass: reflection on the upper part, bezel shadow, dust and hairlines
     const GradStop glass[] = { { 0.0f, 0x1cffffff }, { 0.45f, 0x06ffffff }, { 0.46f, 0x00ffffff }, { 1.0f, 0x14000000 } };
     g.setLinear (b.x, b.y, b.x, b.bottom(), glass, 4);
     g.fillRoundRect (b.x, b.y, b.w, b.h, r);
     const GradStop inner[] = { { 0.0f, 0x88000000 }, { 1.0f, 0x00000000 } };
     g.setLinear (b.x, b.y, b.x, b.y + 0.22f * b.h, inner, 2);
     g.fillRoundRect (b.x, b.y, b.w, 0.22f * b.h, r);
+    g.save();
+    g.clipRect (b.x, b.y, b.w, b.h);
+    glassWear (g, b, (uint32_t) (b.x * 7.0f + b.y * 13.0f), 0.7f + 1.3f * p.wear);
+    g.restore();
+}
+
+/** Small caption printed under a read-out. */
+template <class G>
+void readoutCaption (G& g, const Palette& p, Rect r, const char* text)
+{
+    ink (g, p, text, r, 10.5f, 0, 0.16f, true);
 }
 
 //==============================================================================
@@ -724,7 +1120,8 @@ inline const char* vuLegend (int meterIndex)
     }
 }
 
-/** VU meter, static part: mounting cut-out, bezel, back-lit paper face and printing. Fills the whole rect. */
+/** VU meter, static part: mounting plate, bezel, back-lit paper face and printing. Fills the whole rect.
+    FAT/CLEAN: two lamps behind the lower corners. ANALOG: one bulb behind the middle of the scale. */
 template <class G>
 void vuStatic (G& g, Rect b, const Palette& p, int meterIndex)
 {
@@ -739,6 +1136,8 @@ void vuStatic (G& g, Rect b, const Palette& p, int meterIndex)
     g.line (b.x, b.bottom() - 0.5f, b.right(), b.bottom() - 0.5f, 1.0f);
     g.setColour (p.lightPanel ? 0x30ffffff : 0x14ffffff);
     g.line (b.right() - 0.5f, b.y, b.right() - 0.5f, b.bottom(), 1.0f);
+    for (int i = 0; i < 4; ++i)   // the meter's mounting screws
+        screw (g, i % 2 == 0 ? b.x + 3.6f : b.right() - 3.6f, i < 2 ? b.y + 3.6f : b.bottom() - 3.6f, 2.3f);
 
     // matte black bezel and its shadow on the mounting plate
     softShadow (g, z, 6.0f, 3.0f, 1.5f, 0.5f);
@@ -748,6 +1147,11 @@ void vuStatic (G& g, Rect b, const Palette& p, int meterIndex)
     g.grain (z.x, z.y, z.w, z.h, 1, 31u, 0.05f);
     g.setColour (0x2bffffff);
     g.strokeRoundRect (z.x + 0.5f, z.y + 0.5f, z.w - 1.0f, z.h - 1.0f, 6.0f, 1.0f);
+    {   // thin polished trim around the window
+        const GradStop trim[] = { { 0.0f, 0xffeef1f4 }, { 0.4f, 0xff9aa0a7 }, { 0.75f, 0xff464b51 }, { 1.0f, 0xffb6bcc3 } };
+        g.setLinear (f.x, f.y, f.right(), f.bottom(), trim, 4);
+        g.strokeRoundRect (f.x - 2.4f, f.y - 2.4f, f.w + 4.8f, f.h + 4.8f, 4.0f, 1.3f);
+    }
 
     // paper face
     g.setColour (0xff000000);
@@ -757,20 +1161,50 @@ void vuStatic (G& g, Rect b, const Palette& p, int meterIndex)
     g.fillRoundRect (f.x, f.y, f.w, f.h, 2.5f);
     g.grain (f.x, f.y, f.w, f.h, 2, 913u, 0.07f);
 
-    // back-light: two lamps behind the lower corners, coloured by the mode
-    for (int side = 0; side < 2; ++side)
-    {
-        const float lx = side == 0 ? f.x + 0.18f * f.w : f.right() - 0.18f * f.w;
-        const GradStop lamp[] = { { 0.0f, withAlpha (p.meterLamp, 0.62f) }, { 0.55f, withAlpha (p.meterLamp, 0.22f) }, { 1.0f, withAlpha (p.meterLamp, 0.0f) } };
-        g.setRadial (lx, f.bottom() + 6.0f, 0.75f * f.w, lamp, 3);
-        g.fillRect (f.x, f.y, f.w, f.h);
-    }
-    const GradStop vig[] = { { 0.0f, 0x00000000 }, { 0.7f, 0x14000000 }, { 1.0f, 0x45000000 } };
-    g.setRadial (f.cx(), f.bottom() - 0.25f * f.h, 0.85f * f.w, vig, 3);
-    g.fillRect (f.x, f.y, f.w, f.h);
-
     g.save();
     g.clipRect (f.x, f.y, f.w, f.h);
+    if (p.wear > 0.0f)   // paper yellowed with age, a few faint stains
+    {
+        g.setColour (withAlpha (0xffc89a50, 0.10f * p.wear));
+        g.fillRect (f.x, f.y, f.w, f.h);
+        WearRng rnd (777u);
+        for (int i = 0; i < 3; ++i)
+        {
+            const float rr = rnd.range (12.0f, 30.0f), cx = f.x + rnd.range (0.1f, 0.9f) * f.w, cy = f.y + rnd.range (0.1f, 0.6f) * f.h;
+            const GradStop st[] = { { 0.0f, withAlpha (0xff8a6a3a, 0.06f * p.wear) }, { 0.8f, withAlpha (0xff8a6a3a, 0.03f * p.wear) }, { 1.0f, 0x008a6a3a } };
+            g.setRadial (cx, cy, rr, st, 3);
+            g.fillEllipse (cx - rr, cy - rr, 2.0f * rr, 2.0f * rr);
+        }
+    }
+
+    if (p.centerLamp)
+    {
+        // a single bulb behind the middle of the scale: hot centre, light falling off towards the corners
+        const float lx = f.cx(), ly = f.y + 0.60f * f.h;
+        const GradStop lamp[] = { { 0.0f, withAlpha (p.meterLamp, 0.80f) }, { 0.22f, withAlpha (p.meterLamp, 0.55f) },
+                                  { 0.55f, withAlpha (p.meterLamp, 0.20f) }, { 1.0f, withAlpha (p.meterLamp, 0.0f) } };
+        g.setRadial (lx, ly, 0.70f * f.w, lamp, 4);
+        g.fillRect (f.x, f.y, f.w, f.h);
+        const GradStop hot[] = { { 0.0f, withAlpha (0xfffff3dc, 0.30f) }, { 1.0f, 0x00fff3dc } };
+        g.setRadial (lx, ly + 4.0f, 0.13f * f.w, hot, 2);
+        g.fillRect (f.x, f.y, f.w, f.h);
+        const GradStop vig[] = { { 0.0f, 0x00000000 }, { 0.55f, 0x10000000 }, { 1.0f, 0x66000000 } };
+        g.setRadial (lx, ly, 0.75f * f.w, vig, 3);
+        g.fillRect (f.x, f.y, f.w, f.h);
+    }
+    else
+    {
+        for (int side = 0; side < 2; ++side)   // two lamps behind the lower corners
+        {
+            const float lx = side == 0 ? f.x + 0.18f * f.w : f.right() - 0.18f * f.w;
+            const GradStop lamp[] = { { 0.0f, withAlpha (p.meterLamp, 0.62f) }, { 0.55f, withAlpha (p.meterLamp, 0.22f) }, { 1.0f, withAlpha (p.meterLamp, 0.0f) } };
+            g.setRadial (lx, f.bottom() + 6.0f, 0.75f * f.w, lamp, 3);
+            g.fillRect (f.x, f.y, f.w, f.h);
+        }
+        const GradStop vig[] = { { 0.0f, 0x00000000 }, { 0.7f, 0x14000000 }, { 1.0f, 0x45000000 } };
+        g.setRadial (f.cx(), f.bottom() - 0.25f * f.h, 0.85f * f.w, vig, 3);
+        g.fillRect (f.x, f.y, f.w, f.h);
+    }
 
     // printing
     auto defl = [] (float vu) { return std::pow (10.0f, (vu - 3.0f) / 20.0f); };
@@ -821,6 +1255,12 @@ void vuStatic (G& g, Rect b, const Palette& p, int meterIndex)
     g.fillRect (f.x, f.y, f.w, 12.0f);
     g.setLinear (f.x, f.y, f.x + 8.0f, f.y, topSh, 2);
     g.fillRect (f.x, f.y, 8.0f, f.h);
+
+    // the cover glass: a little dust and a few hairlines (more on a worn unit)
+    g.save();
+    g.clipRect (f.x, f.y, f.w, f.h);
+    glassWear (g, f, 4321u, 0.6f + 1.4f * p.wear);
+    g.restore();
 }
 
 /** VU meter, moving part: needle with its shadow, pivot housing, glass. */
@@ -871,6 +1311,7 @@ void vuDynamic (G& g, Rect b, float deflection)
     g.fillPath();
 }
 
+
 //==============================================================================
 /** Printed scale around a knob. */
 template <class G>
@@ -900,32 +1341,243 @@ void knobScale (G& g, const Palette& p, Rect k, const float* props, const char* 
 inline float hpfProportion (float hz) { return std::pow ((hz - 20.0f) / 480.0f, 0.45f); }
 
 //==============================================================================
-/** The static faceplate: anodised panel, ears, legends, scales, strip. */
+/** Colour of the bare faceplate at (x, y): base gradient, sheen and vignette (as panel() paints them). */
+inline uint32_t panelColourAt (const Palette& p, float x, float y)
+{
+    auto lin = [x, y] (float x0, float y0, float x1, float y1)
+    {
+        const float dx = x1 - x0, dy = y1 - y0;
+        return std::max (0.0f, std::min (1.0f, ((x - x0) * dx + (y - y0) * dy) / (dx * dx + dy * dy)));
+    };
+    uint32_t c = mix (p.panelA, p.panelB, lin (0.0f, 0.0f, 0.55f * kW, 1.25f * kMainH));
+    const float ts = lin (0.15f * kW, 0.0f, 0.55f * kW, kMainH);
+    const float sheenPeak = (p.lightPanel ? 38.0f : 12.0f) / 255.0f;
+    c = mix (c, 0xffffffff, sheenPeak * (ts < 0.45f ? ts / 0.45f : (1.0f - ts) / 0.55f));
+    const float d = std::hypot (x - 0.45f * kW, y - 0.42f * kMainH) / (0.62f * kW);
+    const float va = d < 0.75f ? d / 0.75f * (16.0f / 255.0f) : (16.0f + (56.0f - 16.0f) * std::min (1.0f, (d - 0.75f) / 0.25f)) / 255.0f;
+    return mix (c, 0xff000000, va);
+}
+
+/** A faceplate that has lived in a studio rack: hairline scratches, finish rubbed around the knobs,
+    worn edges and rack-screw marks, grime in the corners, rubbed silkscreen. Only drawn in ANALOG. */
+template <class G>
+void panelWear (G& g, const Palette& p)
+{
+    const float a = p.wear;
+    WearRng rnd (p.lightPanel ? 7771u : 4441u);
+    const uint32_t bare  = p.lightPanel ? 0xfff6f8fa : 0xffc9cdd3;   // bare aluminium under the anodising
+    const uint32_t grime = 0xff15120e;
+
+    for (int i = 0; i < 150; ++i)   // fine scratches all over (cleaning, cables, other gear)
+    {
+        const float x = rnd.range (36.0f, kW - 36.0f), y = rnd.range (4.0f, kMainH - 4.0f);
+        const bool horizontal = rnd.uni() < 0.6f;
+        const float ang = horizontal ? rnd.range (-0.25f, 0.25f) : rnd.range (-kPi, kPi);
+        const float len = rnd.uni() < 0.85f ? rnd.range (3.0f, 26.0f) : rnd.range (30.0f, 90.0f);
+        const bool dark = p.lightPanel && rnd.uni() < 0.35f;
+        scratch (g, x, y, ang, len, rnd.range (-0.04f, 0.04f), rnd.range (0.3f, 0.6f), dark ? grime : bare, a * rnd.range (0.05f, 0.16f));
+    }
+    for (int j = 0; j < 4; ++j)   // a few long, deeper ones
+        scratch (g, rnd.range (120.0f, 760.0f), rnd.range (90.0f, 320.0f), rnd.range (-0.6f, 0.6f), rnd.range (70.0f, 150.0f),
+                 rnd.range (-0.03f, 0.03f), 0.7f, bare, 0.2f * a);
+
+    // finish rubbed around the knobs by fingers: faint polished halo + concentric marks
+    const Rect knobs[] = { layout::input(), layout::output(), layout::attack(), layout::release() };
+    for (const Rect& k : knobs)
+    {
+        const float kr = knobRadius (k.w);
+        const GradStop halo[] = { { 0.0f, 0x00ffffff }, { 0.78f, 0x00ffffff }, { 0.9f, withAlpha (bare, 0.05f * a) }, { 1.0f, 0x00ffffff } };
+        g.setRadial (k.cx(), k.cy(), kr * 1.32f, halo, 4);
+        g.fillEllipse (k.cx() - kr * 1.32f, k.cy() - kr * 1.32f, kr * 2.64f, kr * 2.64f);
+        for (int j = 0; j < 22; ++j)
+        {
+            const float rr = kr * rnd.range (1.02f, 1.22f);
+            const float a0 = rnd.range (0.0f, 2.0f * kPi), len = rnd.range (0.15f, 0.8f);
+            g.setColour (withAlpha (bare, a * rnd.range (0.02f, 0.06f)));
+            g.newPath(); g.arc (k.cx(), k.cy(), rr, a0, a0 + len, true); g.strokePath (rnd.range (0.3f, 0.6f));
+        }
+    }
+
+    // worn edges of the ears and marks around the rack screws
+    for (int side = 0; side < 2; ++side)
+    {
+        const Rect e = side == 0 ? layout::leftEar() : layout::rightEar();
+        const float edgeX = side == 0 ? 1.5f : kW - 1.5f;
+        for (int j = 0; j < 40; ++j)
+        {
+            const float y = rnd.range (2.0f, kMainH - 2.0f), rr = rnd.range (0.4f, 1.6f);
+            g.setColour (withAlpha (bare, a * rnd.range (0.10f, 0.30f)));
+            g.fillEllipse (edgeX - rr + rnd.range (-1.0f, 1.0f), y - 2.0f * rr, 2.0f * rr, 4.0f * rr);
+        }
+        for (const float sy : { 50.0f, kMainH - 50.0f })
+            for (int j = 0; j < 9; ++j)
+            {
+                const float rr = rnd.range (9.0f, 14.0f), a0 = rnd.range (0.0f, 2.0f * kPi);
+                g.setColour (withAlpha (bare, a * rnd.range (0.05f, 0.12f)));
+                g.newPath(); g.arc (e.cx(), sy + 4.0f, rr, a0, a0 + rnd.range (0.4f, 1.6f), true); g.strokePath (0.5f);
+            }
+    }
+    for (int j = 0; j < 60; ++j)   // top and bottom edges
+    {
+        const bool topEdge = rnd.uni() < 0.5f;
+        const float x = rnd.range (36.0f, kW - 36.0f), rr = rnd.range (0.4f, 1.4f);
+        g.setColour (withAlpha (bare, a * rnd.range (0.08f, 0.22f)));
+        g.fillEllipse (x - 2.5f * rr, (topEdge ? 1.0f : kMainH - 3.0f) - rr, 5.0f * rr, 2.0f * rr);
+    }
+
+    // grime in the corners and along the header rule
+    const float grimeSpots[][3] = { { 40.0f, 6.0f, 22.0f }, { kW - 40.0f, 6.0f, 22.0f }, { 40.0f, kMainH - 6.0f, 22.0f }, { kW - 40.0f, kMainH - 6.0f, 22.0f },
+                                    { 60.0f, 64.0f, 12.0f }, { kW - 60.0f, 64.0f, 12.0f } };
+    for (auto& gs : grimeSpots)
+    {
+        const GradStop gr[] = { { 0.0f, withAlpha (grime, 0.22f * a) }, { 1.0f, 0x00000000 } };
+        g.setRadial (gs[0], gs[1], gs[2], gr, 2);
+        g.fillEllipse (gs[0] - gs[2], gs[1] - gs[2], 2.0f * gs[2], 2.0f * gs[2]);
+    }
+
+    // silkscreen rubbed off where hands go most: little patches of bare finish over the print
+    auto rubInk = [&] (Rect r, int count)
+    {
+        for (int j = 0; j < count; ++j)
+        {
+            const float rr = rnd.range (0.5f, 1.5f);
+            const float x = r.x + rnd.uni() * r.w, y = r.y + rnd.uni() * r.h;
+            g.setColour (withAlpha (panelColourAt (p, x, y), a * rnd.range (0.55f, 0.9f)));
+            g.fillEllipse (x - rr, y - 0.6f * rr, 2.0f * rr, 1.2f * rr);
+        }
+    };
+    const Rect in = layout::input(), out = layout::output();
+    rubInk ({ in.x + 30.0f, 74.0f, 68.0f, 16.0f }, 26);           // INPUT
+    rubInk ({ out.x + 24.0f, 74.0f, 80.0f, 16.0f }, 26);          // OUTPUT
+    rubInk ({ 806.0f, 66.0f, 88.0f, 14.0f }, 18);                 // ATTACK
+    rubInk ({ 802.0f, 198.0f, 96.0f, 14.0f }, 18);                // RELEASE
+    rubInk ({ in.x - 6.0f, in.bottom() - 18.0f, 30.0f, 14.0f }, 10);
+    rubInk ({ out.right() - 18.0f, out.bottom() - 18.0f, 34.0f, 14.0f }, 10);
+    rubInk ({ 60.0f, 14.0f, 250.0f, 34.0f }, 30);                 // logo
+
+    for (const Rect& k : { in, out })   // fingerprint haze near the big knobs
+    {
+        const float r = 34.0f, cx = k.cx() + rnd.range (-60.0f, 60.0f), cy = k.cy() + rnd.range (40.0f, 70.0f);
+        const GradStop sm[] = { { 0.0f, withAlpha (0xffffffff, 0.035f * a) }, { 1.0f, 0x00ffffff } };
+        g.setRadial (cx, cy, r, sm, 2);
+        g.fillEllipse (cx - r, cy - r, 2.0f * r, 2.0f * r);
+    }
+}
+
+//==============================================================================
+/** The ADVANCED drawer: a black brushed plate on chrome slide rails below the faceplate. */
+template <class G>
+void drawerArt (G& g, const Palette& p)
+{
+    const float y0 = kMainH;
+    g.setColour (0xff0a0a0b);   // the space under the faceplate
+    g.fillRect (0.0f, y0, kW, kDrawerH);
+    const Rect d = layout::drawer();
+
+    for (const float rx : { d.x - 10.0f, d.right() + 2.0f })   // slide rails
+    {
+        const GradStop rail[] = { { 0.0f, 0xff5b6067 }, { 0.35f, 0xffd9dde2 }, { 0.6f, 0xff9097a0 }, { 1.0f, 0xff3b3f44 } };
+        g.setLinear (rx, 0.0f, rx + 8.0f, 0.0f, rail, 4);
+        g.fillRect (rx, y0, 8.0f, d.h + 4.0f);
+        for (int i = 0; i < 3; ++i)
+            hexScrew (g, rx + 4.0f, y0 + 28.0f + 52.0f * (float) i, 2.4f);
+    }
+
+    const GradStop sg[] = { { 0.0f, 0xff1d1e20 }, { 1.0f, 0xff121314 } };
+    g.setLinear (d.x, d.y, d.x, d.bottom(), sg, 2);
+    g.fillRoundRect (d.x, d.y, d.w, d.h, 5.0f);
+    g.grain (d.x, d.y, d.w, d.h, 0, 99u, 0.065f);
+    g.setColour (0x22ffffff);
+    g.line (d.x + 5.0f, d.bottom() - 0.5f, d.right() - 5.0f, d.bottom() - 0.5f, 1.0f);
+    for (int i = 0; i < 4; ++i)
+        hexScrew (g, i % 2 == 0 ? d.x + 10.0f : d.right() - 10.0f, i < 2 ? d.y + 12.0f : d.bottom() - 10.0f, 3.4f);
+
+    const GradStop topSh[] = { { 0.0f, 0xcc000000 }, { 1.0f, 0x00000000 } };   // the faceplate's shadow
+    g.setLinear (0.0f, y0, 0.0f, y0 + 16.0f, topSh, 2);
+    g.fillRect (0.0f, y0, kW, 16.0f);
+
+    // the drawer is black on both revisions, so its legends use light ink
+    Palette sp = p;
+    sp.lightPanel = false;
+    sp.ink = 0xebe9e3d6;
+    sp.inkDim = 0xc4b9b2a3;
+
+    ink (g, sp, "MODE",         { 64.0f, y0 + 12.0f, 246.0f, 14.0f }, 14.0f, 0, 0.18f);
+    ink (g, sp, "REVISION",     { 346.0f, y0 + 12.0f, 134.0f, 14.0f }, 14.0f, 0, 0.18f);
+    ink (g, sp, "OVERSAMPLING", { 512.0f, y0 + 12.0f, 294.0f, 14.0f }, 14.0f, 0, 0.18f);
+    ink (g, sp, "DISPLAYS",     { 840.0f, y0 + 12.0f, 96.0f, 14.0f }, 14.0f, 0, 0.18f);
+    for (const float sx : { 328.0f, 496.0f, 823.0f })   // engraved group separators
+    {
+        g.setColour (0x70000000);
+        g.fillRect (sx, y0 + 14.0f, 1.0f, 56.0f);
+        g.setColour (0x16ffffff);
+        g.fillRect (sx + 1.0f, y0 + 14.0f, 1.0f, 56.0f);
+    }
+    g.setColour (0x60000000);
+    g.fillRect (60.0f, y0 + 80.0f, kW - 120.0f, 1.0f);
+    g.setColour (0x12ffffff);
+    g.fillRect (60.0f, y0 + 81.0f, kW - 120.0f, 1.0f);
+
+    const Rect mx = layout::mix(), hp = layout::hpf();
+    ink (g, sp, "MIX",    { mx.x - 20.0f, y0 + 87.0f, mx.w + 40.0f, 12.0f }, 13.0f, 0, 0.16f);
+    ink (g, sp, "SC HPF", { hp.x - 20.0f, y0 + 87.0f, hp.w + 40.0f, 12.0f }, 13.0f, 0, 0.16f);
+    {
+        const float pr[] = { 0.0f, 1.0f };
+        const char* lb[] = { "DRY", "WET" };
+        knobScale (g, sp, mx, pr, lb, 2, 0, 16.0f, 11.0f);
+    }
+    {
+        const float pr[] = { 0.0f, 1.0f };
+        const char* lb[] = { "OFF", "500" };
+        knobScale (g, sp, hp, pr, lb, 2, 0, 16.0f, 11.0f);
+    }
+    ink (g, sp, "SWITCHES", { 404.0f, y0 + 89.0f, 284.0f, 12.0f }, 13.0f, 0, 0.16f);
+    const char* tCaps[] = { "STEREO DETECTOR", "COLOUR ONLY", "HISS + HUM (ANALOG)" };
+    for (int i = 0; i < 3; ++i)
+    {
+        const Rect t = layout::toggle (i);
+        ink (g, sp, tCaps[i], { t.x - 10.0f, t.bottom() + 4.0f, t.w + 20.0f, 12.0f }, 10.5f, 0, 0.08f, true);
+    }
+    serialPlate (g, layout::plate());
+
+    if (p.wear > 0.0f)   // the drawer gets handled too
+    {
+        WearRng rnd (9090u);
+        for (int i = 0; i < 40; ++i)
+            scratch (g, rnd.range (d.x + 8.0f, d.right() - 30.0f), rnd.range (d.y + 6.0f, d.bottom() - 6.0f), rnd.range (-0.3f, 0.3f),
+                     rnd.range (4.0f, 30.0f), rnd.range (-0.04f, 0.04f), rnd.range (0.3f, 0.5f), 0xffc9cdd3, p.wear * rnd.range (0.04f, 0.12f));
+    }
+}
+
+//==============================================================================
+/** The static artwork: anodised faceplate (ears, handles, legends, scales) and the drawer below it. */
 template <class G>
 void panel (G& g, const Palette& p)
 {
+    const float H = kMainH;
+
     // ---- anodised body: light from the upper left
     const GradStop body[] = { { 0.0f, p.panelA }, { 1.0f, p.panelB } };
-    g.setLinear (0.0f, 0.0f, 0.55f * kW, kH * 1.25f, body, 2);
-    g.fillRect (0.0f, 0.0f, kW, kH);
-    g.grain (0.0f, 0.0f, kW, kH, 0, 4242u, p.grainStrength);
+    g.setLinear (0.0f, 0.0f, 0.55f * kW, H * 1.25f, body, 2);
+    g.fillRect (0.0f, 0.0f, kW, H);
+    g.grain (0.0f, 0.0f, kW, H, 0, 4242u, p.grainStrength);
     const GradStop sheen[] = { { 0.0f, 0x00ffffff }, { 0.45f, p.lightPanel ? 0x26ffffffu : 0x0cffffffu }, { 1.0f, 0x00ffffff } };
-    g.setLinear (0.15f * kW, 0.0f, 0.55f * kW, kH, sheen, 3);
-    g.fillRect (0.0f, 0.0f, kW, kH);
+    g.setLinear (0.15f * kW, 0.0f, 0.55f * kW, H, sheen, 3);
+    g.fillRect (0.0f, 0.0f, kW, H);
     const GradStop vig[] = { { 0.0f, 0x00000000 }, { 0.75f, 0x10000000 }, { 1.0f, 0x38000000 } };
-    g.setRadial (0.45f * kW, 0.42f * kH, 0.62f * kW, vig, 3);
-    g.fillRect (0.0f, 0.0f, kW, kH);
+    g.setRadial (0.45f * kW, 0.42f * H, 0.62f * kW, vig, 3);
+    g.fillRect (0.0f, 0.0f, kW, H);
 
-    // ---- rack ears: same metal, separated by a fine seam
+    // ---- rack ears: same metal, a fine seam, slots, screws and a handle
     for (int side = 0; side < 2; ++side)
     {
         const Rect e = side == 0 ? layout::leftEar() : layout::rightEar();
         const float seamX = side == 0 ? e.right() : e.x;
         g.setColour (0x70000000);
-        g.fillRect (seamX - 0.5f, 0.0f, 1.0f, kH);
+        g.fillRect (seamX - 0.5f, 0.0f, 1.0f, H);
         g.setColour (p.lightPanel ? 0x60ffffff : 0x1affffff);
-        g.fillRect (seamX + (side == 0 ? 0.5f : -1.5f), 0.0f, 1.0f, kH);
-        for (float sy : { 58.0f, kH - 58.0f })
+        g.fillRect (seamX + (side == 0 ? 0.5f : -1.5f), 0.0f, 1.0f, H);
+        for (const float sy : { 50.0f, H - 50.0f })
         {
             g.setColour (0xff0b0b0c);                       // slot through the ear
             g.fillRoundRect (e.cx() - 7.0f, sy - 15.0f, 14.0f, 30.0f, 7.0f);
@@ -936,13 +1588,12 @@ void panel (G& g, const Palette& p)
             g.newPath(); g.arc (e.cx(), sy + 8.0f, 7.0f, 1.6f, 4.7f, true); g.strokePath (0.8f);
             screw (g, e.cx(), sy + 4.0f, 5.5f);
         }
+        rackHandle (g, e.cx(), 96.0f, H - 96.0f, p);
     }
 
     // ---- header
     ink (g, p, "TWINFET", { 56.0f, 12.0f, 260.0f, 40.0f }, 44.0f, -1, 0.10f);
     ink (g, p, "DUAL-REVISION FET LIMITING AMPLIFIER", { 58.0f, 48.0f, 360.0f, 14.0f }, 13.0f, -1, 0.20f, true);
-    ink (g, p, "MODE", { 392.0f, 14.0f, 52.0f, 38.0f }, 17.0f, 1, 0.18f);
-    ink (g, p, "REVISION", { 712.0f, 18.0f, 98.0f, 30.0f }, 15.0f, 1, 0.18f);
     g.setColour (0x40000000);
     g.fillRect (54.0f, 64.0f, kW - 108.0f, 1.0f);
     g.setColour (p.lightPanel ? 0x60ffffff : 0x12ffffff);
@@ -985,49 +1636,16 @@ void panel (G& g, const Palette& p)
         ink (g, p, "FAST", { k.cx() + rl + 10.0f, yy, 40.0f, 12.0f }, 11.0f, -1, 0.10f, true);
     }
 
-    // ---- utility strip: a recessed black sub-panel
-    const Rect s = layout::strip();
-    g.setColour (p.lightPanel ? 0x70ffffff : 0x22ffffff);
-    g.fillRoundRect (s.x, s.y + 1.2f, s.w, s.h, 6.0f);
-    const GradStop sg[] = { { 0.0f, 0xff0e0f10 }, { 1.0f, 0xff1a1b1d } };
-    g.setLinear (s.x, s.y, s.x, s.bottom(), sg, 2);
-    g.fillRoundRect (s.x, s.y, s.w, s.h, 6.0f);
-    g.grain (s.x, s.y, s.w, s.h, 0, 99u, 0.06f);
-    const GradStop inner[] = { { 0.0f, 0x99000000 }, { 1.0f, 0x00000000 } };
-    g.setLinear (s.x, s.y, s.x, s.y + 10.0f, inner, 2);
-    g.fillRoundRect (s.x, s.y, s.w, 10.0f, 6.0f);
+    // ---- the faceplate's lower edge: a lit chamfer and its thickness
+    g.setColour (p.lightPanel ? 0x70ffffff : 0x30ffffff);
+    g.fillRect (0.0f, H - 2.0f, kW, 1.0f);
+    g.setColour (0x90000000);
+    g.fillRect (0.0f, H - 1.0f, kW, 1.0f);
 
-    // the strip is always black, so its legends use light ink
-    Palette sp = p;
-    sp.lightPanel = false;
-    sp.ink = 0xebe9e3d6;
-    sp.inkDim = 0xc4b9b2a3;
+    if (p.wear > 0.0f)
+        panelWear (g, p);
 
-    const Rect mx = layout::mix(), hp = layout::hpf();
-    ink (g, sp, "MIX",    { mx.x - 20.0f, 352.0f, mx.w + 40.0f, 14.0f }, 15.0f, 0, 0.16f);
-    ink (g, sp, "SC HPF", { hp.x - 20.0f, 352.0f, hp.w + 40.0f, 14.0f }, 15.0f, 0, 0.16f);
-    {
-        const float pr[] = { 0.0f, 1.0f };
-        const char* lb[] = { "DRY", "WET" };
-        knobScale (g, sp, mx, pr, lb, 2, 0, 16.0f, 11.0f);
-    }
-    {
-        const float pr[] = { 0.0f, 1.0f };
-        const char* lb[] = { "OFF", "500" };
-        knobScale (g, sp, hp, pr, lb, 2, 0, 16.0f, 11.0f);
-    }
-    const char* tCaps[] = { "STEREO DETECTOR", "COLOUR ONLY", "HISS + HUM (ANALOG)" };
-    for (int i = 0; i < 3; ++i)
-    {
-        const Rect t = layout::toggle (i);
-        ink (g, sp, tCaps[i], { t.x - 10.0f, t.bottom() + 5.0f, t.w + 20.0f, 13.0f }, 11.5f, 0, 0.08f, true);
-    }
-    ink (g, sp, "SWITCHES", { 314.0f, 352.0f, 288.0f, 14.0f }, 15.0f, 0, 0.16f);
-
-    const Rect gr = layout::grReadout(), ol = layout::outReadout();
-    ink (g, sp, "GAIN REDUCTION", { gr.x, 352.0f, gr.w, 14.0f }, 13.0f, 0, 0.14f);
-    ink (g, sp, "OUTPUT LEVEL",   { ol.x, 352.0f, ol.w, 14.0f }, 13.0f, 0, 0.14f);
-    ink (g, sp, "MODEL TF-2", { ol.x, 422.0f, ol.w, 14.0f }, 11.0f, 1, 0.14f, true);
+    drawerArt (g, p);   // only visible while the drawer is open
 }
 
 } // namespace twinui

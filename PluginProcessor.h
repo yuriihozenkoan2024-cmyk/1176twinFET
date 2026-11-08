@@ -23,14 +23,23 @@ namespace pid
     inline constexpr const char* compOff  = "compoff";
     inline constexpr const char* noise    = "noise";
     inline constexpr const char* meter    = "meter";
+    inline constexpr const char* oversampling = "oversampling";
+}
+
+/** Editor-only settings stored with the plugin state (not automatable). */
+namespace uiprop
+{
+    inline constexpr const char* advancedOpen = "uiAdvancedOpen";
+    inline constexpr const char* showValues   = "uiShowValues";
 }
 
 //==============================================================================
-class TwinFetProcessor final : public juce::AudioProcessor
+class TwinFetProcessor final : public juce::AudioProcessor,
+                               private juce::Timer
 {
 public:
     TwinFetProcessor();
-    ~TwinFetProcessor() override = default;
+    ~TwinFetProcessor() override { stopTimer(); }
 
     //==========================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -75,7 +84,13 @@ public:
     std::atomic<float> meterInMeanAbs { 0.0f };
     std::atomic<float> meterOutMeanAbs { 0.0f };
 
+    /** Oversampling factor actually running (useful when the choice is "Auto"). */
+    std::atomic<int> activeOversampling { 4 };
+
 private:
+    void timerCallback() override;
+    void applyOversampling (int choice);   // message thread: re-prepares the engine while processing is suspended
+
     twinfet::Params readParams() const;
 
     twinfet::Engine engine;
@@ -95,6 +110,10 @@ private:
     std::atomic<float>* pLink     = nullptr;
     std::atomic<float>* pCompOff  = nullptr;
     std::atomic<float>* pNoise    = nullptr;
+    std::atomic<float>* pOversampling = nullptr;
+
+    double lastSampleRate = 0.0;
+    int lastBlockSize = 512, lastChannels = 2, engineOsChoice = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TwinFetProcessor)
 };
