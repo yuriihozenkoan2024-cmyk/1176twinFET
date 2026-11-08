@@ -47,7 +47,8 @@ struct Params
 struct Voicing
 {
     // ---- static curve (per ratio button): threshold dBFS, ratio, knee width dB
-    static constexpr double thresholdDb[5] = { -18.0, -14.0, -13.0, -12.0, -20.0 };
+    // spacing between the ratios from bench measurements of a 1176LN (onset of compression vs. ratio)
+    static constexpr double thresholdDb[5] = { -18.0, -13.6, -12.0, -9.8, -20.0 };
     static constexpr double ratioValue[5]  = {   4.0,   8.0,  12.0,  20.0,  16.0 };
     static constexpr double kneeDb[5]      = {  12.0,   9.0,   7.0,   6.0,   4.0 };
 

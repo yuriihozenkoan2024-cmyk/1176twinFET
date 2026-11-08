@@ -136,7 +136,7 @@ private:
     float pos = 0.708f, vel = 0.0f;
     int meterIndex = 0;
 
-    juce::Image face;
+    juce::Image face, glassLayer;   // cached: everything under the needle / the cover glass above it
     int faceMeter = -1;
     uint32_t faceLamp = 0;
     bool faceLight = false, faceCentre = false;

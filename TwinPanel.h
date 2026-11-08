@@ -614,13 +614,15 @@ template <class G>
 void litButton (G& g, Rect b, bool on, bool hover, bool down, const Palette& p, const char* label, const char* sub)
 {
     if (down) b.y += 0.8f;
-    const float rr = 2.5f;
+    const float rr = 2.2f, bw = 1.3f;   // a thin polished bezel
 
-    softShadow (g, b, rr, 3.0f, 1.6f, p.lightPanel ? 0.35f : 0.55f);
+    softShadow (g, b, rr, 2.6f, 1.4f, p.lightPanel ? 0.32f : 0.5f);
     chromeFill (g, b, rr);
-    const Rect l { b.x + 2.5f, b.y + 2.5f, b.w - 5.0f, b.h - 5.0f };
-    g.setColour (0xf0060606);   // the gap between bezel and lens
-    g.fillRoundRect (l.x - 0.7f, l.y - 0.7f, l.w + 1.4f, l.h + 1.4f, rr - 0.5f);
+    g.setColour (0x66000000);
+    g.strokeRoundRect (b.x, b.y, b.w, b.h, rr, 0.45f);
+    const Rect l { b.x + bw, b.y + bw, b.w - 2.0f * bw, b.h - 2.0f * bw };
+    g.setColour (0xf0060606);   // the hairline gap between bezel and lens
+    g.fillRoundRect (l.x - 0.45f, l.y - 0.45f, l.w + 0.9f, l.h + 0.9f, rr - 0.6f);
 
     uint32_t lensMid = 0xff8f8a80;
     if (on)
@@ -688,11 +690,13 @@ void litButton (G& g, Rect b, bool on, bool hover, bool down, const Palette& p, 
 template <class G>
 void capButton (G& g, Rect b, bool engaged, bool hover, bool down, const Palette& p, const char* label, const char* sub, bool white)
 {
-    const float rr = 2.5f;
+    const float rr = 2.2f, bw = 1.3f;   // a thin polished bezel
     const bool in = engaged || down;
-    softShadow (g, b, rr, 3.0f, 1.6f, p.lightPanel ? 0.35f : 0.55f);
+    softShadow (g, b, rr, 2.6f, 1.4f, p.lightPanel ? 0.32f : 0.5f);
     chromeFill (g, b, rr);
-    const Rect hole { b.x + 2.5f, b.y + 2.5f, b.w - 5.0f, b.h - 5.0f };
+    g.setColour (0x66000000);
+    g.strokeRoundRect (b.x, b.y, b.w, b.h, rr, 0.45f);
+    const Rect hole { b.x + bw, b.y + bw, b.w - 2.0f * bw, b.h - 2.0f * bw };
     g.setColour (0xff040404);
     g.fillRoundRect (hole.x, hole.y, hole.w, hole.h, rr - 1.0f);
 
@@ -938,12 +942,14 @@ template <class G>
 void ledReadout (G& g, Rect b, const char* value, const char* unit, const Palette& p, int cells,
                  bool unitLit = true, float intensity = 1.0f)
 {
-    const float r = 2.0f, bz = 1.8f;
+    const float r = 2.0f, bz = 1.25f;
 
-    // polished bezel, slightly raised off the panel
+    // thin polished bezel, slightly raised off the panel
     const Rect fr { b.x - bz, b.y - bz, b.w + 2.0f * bz, b.h + 2.0f * bz };
     softShadow (g, fr, r + bz, 1.6f, 1.0f, p.lightPanel ? 0.30f : 0.45f);
     chromeFill (g, fr, r + bz);
+    g.setColour (0x66000000);
+    g.strokeRoundRect (fr.x, fr.y, fr.w, fr.h, r + bz, 0.45f);
     g.setColour (0xf0000000);
     g.fillRoundRect (b.x - 0.5f, b.y - 0.5f, b.w + 1.0f, b.h + 1.0f, r + 0.4f);
     const GradStop bg[] = { { 0.0f, mix (p.ledFilter, 0xff000000, 0.45f) }, { 1.0f, p.ledFilter } };
@@ -1179,18 +1185,50 @@ void vuStatic (G& g, Rect b, const Palette& p, int meterIndex)
 
     if (p.centerLamp)
     {
-        // a single bulb behind the middle of the scale: hot centre, light falling off towards the corners
-        const float lx = f.cx(), ly = f.y + 0.60f * f.h;
-        const GradStop lamp[] = { { 0.0f, withAlpha (p.meterLamp, 0.80f) }, { 0.22f, withAlpha (p.meterLamp, 0.55f) },
-                                  { 0.55f, withAlpha (p.meterLamp, 0.20f) }, { 1.0f, withAlpha (p.meterLamp, 0.0f) } };
-        g.setRadial (lx, ly, 0.70f * f.w, lamp, 4);
+        // ANALOG: incandescent bulbs you can actually see. Unlit, the paper sits in the dark; two bulbs in the
+        // lower lip of the window and one behind the middle of the scale each throw their own pool of light.
+        g.setColour (0x553a1a02);
         g.fillRect (f.x, f.y, f.w, f.h);
-        const GradStop hot[] = { { 0.0f, withAlpha (0xfffff3dc, 0.30f) }, { 1.0f, 0x00fff3dc } };
-        g.setRadial (lx, ly + 4.0f, 0.13f * f.w, hot, 2);
+        const uint32_t light = mix (p.meterLamp, 0xffffb050, 0.18f);   // incandescent light: warm amber
+        const float bulbX[] = { f.x + 0.20f * f.w, f.x + 0.80f * f.w };
+        for (const float bx : bulbX)
+        {
+            const float by = f.bottom() + 1.0f;
+            const GradStop pool[] = { { 0.0f, withAlpha (light, 0.95f) }, { 0.18f, withAlpha (light, 0.72f) }, { 0.45f, withAlpha (light, 0.32f) },
+                                      { 0.8f, withAlpha (light, 0.07f) }, { 1.0f, withAlpha (light, 0.0f) } };
+            g.setRadial (bx, by, 0.62f * f.w, pool, 5);
+            g.fillRect (f.x, f.y, f.w, f.h);
+            const GradStop hot[] = { { 0.0f, 0xfffffbea }, { 0.35f, withAlpha (0xffffe6b4, 0.75f) }, { 1.0f, 0x00ffd890 } };
+            g.setRadial (bx, by - 4.0f, 42.0f, hot, 3);
+            g.fillEllipse (bx - 42.0f, by - 46.0f, 84.0f, 84.0f);
+        }
+        {   // the middle bulb, behind the scale: a broader, softer glow
+            const float lx = f.cx(), ly = f.y + 0.62f * f.h;
+            const GradStop mid[] = { { 0.0f, withAlpha (light, 0.62f) }, { 0.5f, withAlpha (light, 0.22f) }, { 1.0f, withAlpha (light, 0.0f) } };
+            g.setRadial (lx, ly, 0.38f * f.w, mid, 3);
+            g.fillRect (f.x, f.y, f.w, f.h);
+            const GradStop core[] = { { 0.0f, withAlpha (0xfffff3dc, 0.35f) }, { 1.0f, 0x00fff3dc } };
+            g.setRadial (lx, ly + 4.0f, 0.12f * f.w, core, 2);
+            g.fillRect (f.x, f.y, f.w, f.h);
+        }
+        const GradStop vig[] = { { 0.0f, 0x00000000 }, { 0.65f, 0x00000000 }, { 1.0f, 0x50000000 } };
+        g.setRadial (f.cx(), f.bottom(), 0.90f * f.w, vig, 3);
         g.fillRect (f.x, f.y, f.w, f.h);
-        const GradStop vig[] = { { 0.0f, 0x00000000 }, { 0.55f, 0x10000000 }, { 1.0f, 0x66000000 } };
-        g.setRadial (lx, ly, 0.75f * f.w, vig, 3);
-        g.fillRect (f.x, f.y, f.w, f.h);
+
+        // the two lower bulbs themselves: small glass envelopes with a glowing filament, half hidden by the lip
+        for (const float bx : bulbX)
+        {
+            const float by = f.bottom() - 1.0f;
+            g.setColour (0x50000000);   // socket shadow
+            g.fillEllipse (bx - 10.0f, by - 6.0f, 20.0f, 14.0f);
+            const GradStop glass[] = { { 0.0f, 0xfffffbf0 }, { 0.45f, 0xffffe6b0 }, { 0.8f, withAlpha (0xffffc070, 0.85f) }, { 1.0f, withAlpha (0xffd08a40, 0.0f) } };
+            g.setRadial (bx, by - 1.0f, 9.5f, glass, 4);
+            g.fillEllipse (bx - 9.5f, by - 8.5f, 19.0f, 15.0f);
+            g.setColour (0xffffffff);   // filament
+            g.line (bx - 3.0f, by - 1.5f, bx + 3.0f, by - 1.5f, 1.0f);
+            g.setColour (0x90ffffff);   // highlight on the glass
+            g.fillEllipse (bx - 6.0f, by - 6.5f, 3.4f, 2.0f);
+        }
     }
     else
     {
@@ -1256,14 +1294,9 @@ void vuStatic (G& g, Rect b, const Palette& p, int meterIndex)
     g.setLinear (f.x, f.y, f.x + 8.0f, f.y, topSh, 2);
     g.fillRect (f.x, f.y, 8.0f, f.h);
 
-    // the cover glass: a little dust and a few hairlines (more on a worn unit)
-    g.save();
-    g.clipRect (f.x, f.y, f.w, f.h);
-    glassWear (g, f, 4321u, 0.6f + 1.4f * p.wear);
-    g.restore();
 }
 
-/** VU meter, moving part: needle with its shadow, pivot housing, glass. */
+/** VU meter, moving part: needle with its shadow and the pivot housing (the glass is vuGlass()). */
 template <class G>
 void vuDynamic (G& g, Rect b, float deflection)
 {
@@ -1297,7 +1330,15 @@ void vuDynamic (G& g, Rect b, float deflection)
     g.newPath(); g.arc (hx, hy, hr - 0.6f, -1.45f, 0.35f, true); g.strokePath (1.0f);
     g.restore();
 
-    // glass: soft reflection band and a faint streak
+}
+
+/** VU meter cover glass, drawn above the needle: reflection, dust and hairlines. On a worn (ANALOG) unit
+    the glass is properly scratched: cleaning swirls, scattered hairlines and two deeper marks. */
+template <class G>
+void vuGlass (G& g, Rect b, const Palette& p)
+{
+    const VuGeometry geo (b);
+    const Rect f = geo.f;
     const GradStop refl[] = { { 0.0f, 0x2cffffff }, { 0.45f, 0x08ffffff }, { 1.0f, 0x00ffffff } };
     g.setLinear (f.x, f.y, f.x + 0.35f * f.w, f.y + 0.6f * f.h, refl, 3);
     g.fillRoundRect (f.x, f.y, f.w, f.h * 0.6f, 2.5f);
@@ -1309,6 +1350,33 @@ void vuDynamic (G& g, Rect b, float deflection)
     g.lineTo (f.x + 0.40f * f.w, f.bottom());
     g.closePath();
     g.fillPath();
+
+    g.save();
+    g.clipRect (f.x, f.y, f.w, f.h);
+    glassWear (g, f, 4321u, 0.6f + 1.0f * p.wear);
+    if (p.wear > 0.0f)
+    {
+        WearRng rnd (2468u);
+        const float a = p.wear;
+        for (int i = 0; i < 12; ++i)   // swirls from wiping the glass
+        {
+            const float cx = f.x + rnd.range (0.0f, 1.0f) * f.w, cy = f.y + rnd.range (0.2f, 1.4f) * f.h;
+            const float r = rnd.range (40.0f, 150.0f), a0 = rnd.range (-1.2f, 1.2f);
+            g.setColour (withAlpha (0xffffffff, a * rnd.range (0.08f, 0.16f)));
+            g.newPath(); g.arc (cx, cy, r, a0, a0 + rnd.range (0.15f, 0.5f), true); g.strokePath (rnd.range (0.3f, 0.5f));
+        }
+        for (int i = 0; i < 28; ++i)   // scattered hairlines
+            scratch (g, f.x + rnd.uni() * f.w, f.y + rnd.uni() * f.h, rnd.range (-kPi, kPi), rnd.range (6.0f, 70.0f),
+                     rnd.range (-0.04f, 0.04f), rnd.range (0.3f, 0.5f), 0xffffffff, a * rnd.range (0.11f, 0.24f));
+        for (int i = 0; i < 2; ++i)    // two deeper scratches that catch the light, each with its dark lower edge
+        {
+            const float x = f.x + rnd.range (0.1f, 0.6f) * f.w, y = f.y + rnd.range (0.15f, 0.75f) * f.h;
+            const float ang = rnd.range (-0.5f, 0.5f), len = rnd.range (60.0f, 130.0f), bow = rnd.range (-0.03f, 0.03f);
+            scratch (g, x + 0.3f, y + 0.6f, ang, len, bow, 0.7f, 0xff000000, 0.14f * a);
+            scratch (g, x, y, ang, len, bow, 0.65f, 0xffffffff, 0.40f * a);
+        }
+    }
+    g.restore();
 }
 
 

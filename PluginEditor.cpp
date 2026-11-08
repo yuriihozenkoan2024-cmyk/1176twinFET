@@ -249,8 +249,15 @@ void VuMeter::paint (juce::Graphics& g)
         face = juce::Image (juce::Image::ARGB, pw, ph, true);
         juce::Graphics fg (face);
         fg.addTransform (juce::AffineTransform::scale ((float) pw / (float) getWidth(), (float) ph / (float) getHeight()));
-        JuceCanvas fc (fg, look);
-        twinui::vuStatic (fc, r, look.palette, meterIndex);
+        {
+            JuceCanvas fc (fg, look);
+            twinui::vuStatic (fc, r, look.palette, meterIndex);
+        }
+        glassLayer = juce::Image (juce::Image::ARGB, pw, ph, true);
+        juce::Graphics gg (glassLayer);
+        gg.addTransform (juce::AffineTransform::scale ((float) pw / (float) getWidth(), (float) ph / (float) getHeight()));
+        JuceCanvas gc (gg, look);
+        twinui::vuGlass (gc, r, look.palette);
         faceMeter = meterIndex;
         faceLamp = look.palette.meterLamp;
         faceLight = look.palette.lightPanel;
@@ -259,9 +266,12 @@ void VuMeter::paint (juce::Graphics& g)
     }
     g.setColour (juce::Colours::black);
     g.drawImage (face, getLocalBounds().toFloat());
-
-    JuceCanvas cv (g, look);
-    twinui::vuDynamic (cv, r, pos);
+    {
+        JuceCanvas cv (g, look);
+        twinui::vuDynamic (cv, r, pos);
+    }
+    g.setColour (juce::Colours::black);
+    g.drawImage (glassLayer, getLocalBounds().toFloat());
 }
 
 //==============================================================================
